@@ -482,8 +482,12 @@ function go(tab){
   S.view = (tab==="search" && S.results && S.searchView==="results") ? "results" : null;
   render();
 }
+let LASTKEY="";
 function render(){
   renderNav();
+  const key=S.tab+"/"+(S.view||"");
+  const nav = key!==LASTKEY; LASTKEY=key;
+  const y = window.scrollY||0;
   let h="";
   if(S.view==="settings")         h=vSettings();
   else if(S.view==="results")     h=vResults();
@@ -491,8 +495,12 @@ function render(){
   else h=({home:vHome,search:vSearch,news:vNews,favs:vFavs,profiles:vProfiles})[S.tab]();
   const m=document.getElementById("view");
   m.innerHTML=h;
-  m.style.animation="none"; void m.offsetHeight; m.style.animation="";
-  window.scrollTo(0,0);
+  if(nav){
+    m.style.animation="none"; void m.offsetHeight; m.style.animation="";
+    window.scrollTo(0,0);
+  }else{
+    window.scrollTo(0,y);
+  }
 }
 
 /* ════════════════════ Écran Accueil ════════════════════ */
@@ -614,7 +622,7 @@ function vSettings(){
   <p class="eyebrow">Données</p>
   <button class="btn danger" data-act="reset">${I.trash} Réinitialiser l'application</button>
   <div class="spacer"></div>
-  <p class="hint" style="text-align:center">Escapade v0.8 — moteurs, veille & mode abonnement</p>`;
+  <p class="hint" style="text-align:center">Escapade v0.8.1 — moteurs, veille & mode abonnement</p>`;
 }
 async function testKey(kind){
   const isC = kind==="c";
