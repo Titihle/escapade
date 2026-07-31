@@ -1,0 +1,840 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Escapade — des idées de sorties pour toute la tribu</title>
+<meta name="description" content="Escapade trouve des idées de sorties sur mesure pour toute la tribu : nature, restaurants, spectacles, événements autour de vous.">
+<meta name="theme-color" content="#5F7A4F">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500;1,9..144,600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ───────────────────────────── Tokens ───────────────────────────── */
+:root{
+  --paper:#F6F3EC;      /* blanc cassé */
+  --card:#FFFFFF;
+  --ink:#233020;        /* vert-noir du texte */
+  --soft:#75806B;       /* texte secondaire, sauge grisée */
+  --sage:#5F7A4F;       /* accent principal */
+  --sage-deep:#48603B;
+  --mist:#E3EAD8;       /* sauge très claire (états sélectionnés) */
+  --mist-2:#EFF3E7;
+  --line:#E7E2D4;
+  --danger:#A45B45;
+  --r:18px;
+  --shadow:0 1px 2px rgba(35,48,32,.05),0 10px 30px -18px rgba(35,48,32,.25);
+  --pad:20px;
+}
+/* ───────────────────────────── Base ───────────────────────────── */
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  font-family:"Outfit",system-ui,-apple-system,"Segoe UI",sans-serif;
+  background:var(--paper);color:var(--ink);
+  font-size:15.5px;line-height:1.55;
+  min-height:100dvh;
+}
+#app{max-width:560px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column}
+main{flex:1;padding:6px var(--pad) 110px;animation:rise .22s ease both}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+h1,h2,h3,.serif{font-family:"Fraunces",Georgia,serif;font-weight:600;letter-spacing:-.01em}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;-webkit-tap-highlight-color:transparent}
+input,select,textarea{font:inherit;color:inherit}
+a{color:var(--sage-deep)}
+:focus-visible{outline:2.5px solid var(--sage);outline-offset:2px;border-radius:8px}
+::selection{background:var(--mist)}
+
+/* ───────────────────────────── Header ───────────────────────────── */
+header{
+  position:sticky;top:0;z-index:20;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px var(--pad) 10px;
+  background:linear-gradient(var(--paper) 78%,rgba(246,243,236,0));
+}
+.brand{display:flex;align-items:center;gap:9px}
+.brand svg{width:24px;height:24px}
+.wordmark{font-family:"Fraunces",serif;font-style:italic;font-weight:600;font-size:23px;letter-spacing:.01em}
+.iconbtn{width:40px;height:40px;border-radius:13px;display:grid;place-items:center;color:var(--soft);transition:background .15s}
+.iconbtn:active{background:var(--mist-2)}
+.iconbtn svg{width:21px;height:21px}
+
+/* ───────────────────────────── Nav basse ───────────────────────────── */
+nav{
+  position:fixed;bottom:0;left:0;right:0;z-index:30;
+  background:rgba(255,255,255,.92);backdrop-filter:blur(10px);
+  border-top:1px solid var(--line);
+  padding:8px 6px calc(10px + env(safe-area-inset-bottom));
+}
+.nav-in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr)}
+.tab{display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 2px;border-radius:12px;color:var(--soft);font-size:10.5px;font-weight:500;letter-spacing:.01em}
+.tab svg{width:22px;height:22px}
+.tab.on{color:var(--sage-deep)}
+.tab.on .dot{width:4px;height:4px;border-radius:50%;background:var(--sage);margin-top:1px}
+.tab .dot{width:4px;height:4px;border-radius:50%;background:transparent;margin-top:1px}
+
+/* ───────────────────────────── Blocs communs ───────────────────────────── */
+.eyebrow{font-size:11.5px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--sage);margin:26px 0 10px}
+.eyebrow:first-child{margin-top:8px}
+.eyebrow small{color:var(--soft);font-weight:500;letter-spacing:.02em;text-transform:none;font-size:12px;margin-left:6px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+.hint{color:var(--soft);font-size:13.5px}
+.spacer{height:10px}
+
+/* Puces (chips) */
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:9px 14px;border-radius:999px;background:var(--card);
+  border:1.5px solid var(--line);font-size:14px;font-weight:500;color:var(--ink);
+  transition:transform .08s, background .15s, border-color .15s;
+}
+.chip:active{transform:scale(.96)}
+.chip.on{background:var(--mist);border-color:var(--sage);color:var(--sage-deep);font-weight:600}
+.chip .av{width:22px;height:22px;font-size:11px;margin:0 0 0 -4px}
+
+/* Avatars */
+.av{
+  width:38px;height:38px;border-radius:50%;display:inline-grid;place-items:center;
+  color:#fff;font-weight:700;font-size:15px;font-family:"Outfit";flex:none;
+}
+
+/* Grille des types de sortie */
+.catgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.cat{
+  display:flex;align-items:center;gap:10px;padding:13px 13px;
+  background:var(--card);border:1.5px solid var(--line);border-radius:15px;
+  font-size:13.5px;font-weight:600;text-align:left;line-height:1.25;
+  transition:transform .08s, background .15s, border-color .15s;
+}
+.cat:active{transform:scale(.97)}
+.cat .em{font-size:21px;flex:none}
+.cat.on{background:var(--mist);border-color:var(--sage);color:var(--sage-deep)}
+
+/* Sous-options */
+.subbox{background:var(--mist-2);border:1px dashed var(--line);border-radius:15px;padding:13px 14px;margin-top:10px}
+.subbox .sublabel{font-size:12px;font-weight:700;color:var(--sage-deep);letter-spacing:.06em;text-transform:uppercase;margin:10px 0 7px}
+.subbox .sublabel:first-child{margin-top:0}
+.subbox .chip{background:#fff;padding:7px 12px;font-size:13px}
+.subbox .chip.on{background:var(--mist)}
+
+/* Curseurs */
+.range{display:flex;align-items:center;gap:14px;background:var(--card);border:1px solid var(--line);border-radius:15px;padding:14px 16px}
+.range output{font-weight:700;color:var(--sage-deep);min-width:70px;text-align:right;font-size:14.5px}
+input[type=range]{flex:1;accent-color:var(--sage);height:22px}
+input[type=date]{border:1.5px solid var(--line);border-radius:12px;padding:9px 12px;background:#fff;margin-top:10px;width:100%}
+
+/* Interrupteur */
+.switchrow{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:15px;padding:13px 16px;font-weight:500}
+.sw{width:46px;height:27px;border-radius:999px;background:var(--line);position:relative;transition:background .18s;flex:none}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:21px;height:21px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:left .18s}
+.sw.on{background:var(--sage)}
+.sw.on::after{left:22px}
+
+/* Boutons */
+.btn{
+  display:flex;align-items:center;justify-content:center;gap:9px;width:100%;
+  background:var(--sage);color:#fff;font-weight:700;font-size:16px;
+  padding:16px;border-radius:16px;letter-spacing:.01em;
+  box-shadow:0 12px 26px -12px rgba(95,122,79,.55);
+  transition:transform .08s, background .15s;
+}
+.btn:active{transform:scale(.98);background:var(--sage-deep)}
+.btn.ghost{background:transparent;color:var(--sage-deep);border:1.5px solid var(--sage);box-shadow:none}
+.btn.subtle{background:var(--mist-2);color:var(--sage-deep);box-shadow:none;font-weight:600}
+.btn.sm{width:auto;padding:9px 16px;font-size:13.5px;border-radius:12px}
+.btn.danger{background:transparent;color:var(--danger);border:1.5px solid #E3C9BE;box-shadow:none}
+
+/* ───────────────────────────── Accueil ───────────────────────────── */
+.hello{color:var(--soft);font-size:13.5px;margin:6px 0 2px}
+.hero{font-size:31px;line-height:1.15;margin:2px 0 20px;font-style:italic;font-weight:500}
+.hero b{font-style:normal;color:var(--sage-deep);font-weight:600}
+.bigact{display:flex;align-items:center;gap:14px;width:100%;text-align:left;padding:18px;margin-bottom:12px}
+.bigact .ic{width:48px;height:48px;border-radius:15px;background:var(--mist);display:grid;place-items:center;flex:none;color:var(--sage-deep)}
+.bigact .ic svg{width:24px;height:24px}
+.bigact h3{font-size:18.5px;margin-bottom:2px}
+.bigact p{font-size:13px;color:var(--soft);font-family:"Outfit"}
+.bigact .go{margin-left:auto;color:var(--sage);flex:none}
+.tribe{display:flex;align-items:center;gap:-6px;padding:14px 16px}
+.tribe .avs{display:flex}
+.tribe .avs .av{margin-right:-9px;border:2.5px solid var(--card);width:36px;height:36px;font-size:13px}
+.tribe span{margin-left:16px;font-size:13.5px;color:var(--soft)}
+.tribe .lnk{margin-left:auto;font-size:13.5px;font-weight:600;color:var(--sage-deep);flex:none}
+
+/* ───────────────────────────── Résultats ───────────────────────────── */
+.demo{
+  display:flex;gap:9px;align-items:flex-start;background:#FBF7EA;border:1px solid #EADFBD;
+  border-radius:13px;padding:11px 13px;font-size:12.5px;color:#7A6A33;margin-bottom:16px;line-height:1.45;
+}
+.res{padding:16px 16px 14px;margin-bottom:14px;position:relative}
+.res .top{display:flex;gap:12px;align-items:flex-start}
+.rank{
+  width:44px;height:44px;border-radius:14px;background:var(--mist);flex:none;
+  display:grid;place-items:center;position:relative;color:var(--sage-deep);
+}
+.rank svg{width:26px;height:26px}
+.rank i{position:absolute;bottom:-6px;right:-6px;background:var(--sage);color:#fff;font-style:normal;
+  font-size:10.5px;font-weight:800;border-radius:999px;padding:2px 6px;border:2px solid var(--paper)}
+.res h3{font-size:17.5px;line-height:1.28;flex:1}
+.favbtn{flex:none;width:38px;height:38px;border-radius:12px;display:grid;place-items:center;color:#B9B2A0;margin:-4px -4px 0 0}
+.favbtn svg{width:21px;height:21px}
+.favbtn.on{color:var(--sage)}
+.tagrow{display:flex;flex-wrap:wrap;gap:6px;margin:9px 0 8px}
+.tag{font-size:11.5px;font-weight:600;background:var(--mist-2);color:var(--sage-deep);border-radius:999px;padding:4px 10px}
+.tag.meteo{background:#F3F0FB;color:#5B5484}
+.res p.desc{font-size:14px;color:#4A5544;margin-bottom:10px}
+.why{background:var(--mist-2);border-left:3px solid var(--sage);border-radius:0 12px 12px 0;padding:9px 12px;font-size:13px;color:var(--sage-deep);margin-bottom:11px}
+.why b{font-weight:700}
+.meta{display:flex;flex-wrap:wrap;gap:5px 14px;font-size:12.5px;color:var(--soft);margin-bottom:13px}
+.meta span{display:inline-flex;align-items:center;gap:5px}
+.meta svg{width:14px;height:14px;flex:none}
+.linkbtn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:11px;border-radius:13px;text-decoration:none;
+  border:1.5px solid var(--sage);color:var(--sage-deep);font-weight:700;font-size:14px}
+.linkbtn svg{width:15px;height:15px}
+
+/* ───────────────────────────── Quoi de neuf ───────────────────────────── */
+.ev{display:flex;gap:13px;padding:14px;margin-bottom:11px;align-items:flex-start}
+.evdate{flex:none;width:52px;text-align:center;background:var(--mist);border-radius:13px;padding:8px 4px;color:var(--sage-deep)}
+.evdate b{display:block;font-size:19px;font-family:"Fraunces",serif;line-height:1}
+.evdate span{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.ev h3{font-size:15.5px;line-height:1.3}
+.ev .sub{font-size:12.5px;color:var(--soft);margin-top:3px}
+.ev .tagrow{margin:7px 0 0}
+.evlink{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;color:var(--sage-deep);margin-top:10px;text-decoration:none;padding-bottom:2px;border-bottom:1.5px solid var(--mist)}
+.evlink svg{width:13px;height:13px}
+.ev .favbtn{margin:-4px -4px 0 0}
+
+/* ───────────────────────────── Listes profils / favoris ───────────────────────────── */
+.prow{display:flex;align-items:center;gap:13px;padding:13px 15px;margin-bottom:10px;width:100%;text-align:left}
+.prow .nm{font-weight:600;font-size:15.5px}
+.prow .dt{font-size:12.5px;color:var(--soft);margin-top:1px}
+.prow .go{margin-left:auto;color:var(--soft)}
+.empty{padding:30px 22px;text-align:center}
+.empty .em{font-size:34px;margin-bottom:8px}
+.empty h3{font-size:17px;margin-bottom:5px}
+.empty p{font-size:13.5px;color:var(--soft);margin-bottom:16px}
+.seg{display:grid;grid-template-columns:1fr 1fr;background:var(--mist-2);border-radius:14px;padding:4px;margin-bottom:16px}
+.seg button{padding:9px;border-radius:11px;font-weight:600;font-size:14px;color:var(--soft)}
+.seg button.on{background:#fff;color:var(--sage-deep);box-shadow:var(--shadow)}
+.hist{padding:13px 15px;margin-bottom:10px}
+.hist .ts{font-size:11.5px;color:var(--soft);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
+.hist .sum{font-size:14px;font-weight:500;line-height:1.4}
+
+/* ───────────────────────────── Formulaires profil / réglages ───────────────────────────── */
+.field{margin-bottom:16px}
+.field label{display:block;font-size:12.5px;font-weight:700;color:var(--sage-deep);letter-spacing:.04em;margin-bottom:7px;text-transform:uppercase}
+.field input[type=text],.field input[type=number],.field textarea{
+  width:100%;background:#fff;border:1.5px solid var(--line);border-radius:13px;padding:12px 14px;
+}
+.field textarea{min-height:74px;resize:vertical}
+.backrow{display:flex;align-items:center;gap:10px;margin:4px 0 14px}
+.backrow h2{font-size:22px}
+.setrow{display:flex;align-items:center;gap:13px;padding:15px 16px;border-bottom:1px solid var(--line)}
+.setrow:last-child{border-bottom:0}
+.setrow .t{font-weight:600;font-size:14.5px}
+.setrow .d{font-size:12.5px;color:var(--soft)}
+.setrow .soon{margin-left:auto;font-size:10.5px;font-weight:800;letter-spacing:.08em;color:var(--sage);background:var(--mist);border-radius:999px;padding:4px 9px;text-transform:uppercase;flex:none}
+
+/* ───────────────────────────── Loader & toast ───────────────────────────── */
+#loader{position:fixed;inset:0;z-index:60;background:rgba(246,243,236,.96);display:none;place-items:center;text-align:center}
+#loader.on{display:grid}
+#loader svg{width:64px;height:64px;margin-bottom:18px}
+#loader .needle{transform-origin:32px 32px;animation:seek 1.5s cubic-bezier(.45,0,.25,1) infinite}
+@keyframes seek{0%{transform:rotate(0)}45%{transform:rotate(255deg)}70%{transform:rotate(215deg)}100%{transform:rotate(360deg)}}
+#loader h3{font-size:20px;font-style:italic;font-weight:500}
+#loader p{color:var(--soft);font-size:13.5px;margin-top:6px}
+#toast{position:fixed;left:50%;bottom:104px;transform:translate(-50%,20px);z-index:70;
+  background:var(--ink);color:#fff;font-size:13.5px;font-weight:500;padding:11px 18px;border-radius:999px;
+  opacity:0;pointer-events:none;transition:.25s;max-width:88%;text-align:center}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="brand" aria-label="Escapade">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#5F7A4F" stroke-width="1.8"><circle cx="12" cy="12" r="8.6"/><path fill="#5F7A4F" stroke="none" d="M12 6.6 13.9 12 12 17.4 10.1 12z"/></svg>
+      <span class="wordmark">Escapade</span>
+    </div>
+    <button class="iconbtn" data-act="settings" aria-label="Réglages">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h8m4 0h4M4 12h2m4 0h10M4 18h10m4 0h2"/><circle cx="14" cy="6" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="16" cy="18" r="2"/></svg>
+    </button>
+  </header>
+  <main id="view" aria-live="polite"></main>
+  <nav aria-label="Navigation principale"><div class="nav-in" id="nav"></div></nav>
+</div>
+
+<div id="loader" role="status">
+  <div>
+    <svg viewBox="0 0 64 64" fill="none" stroke="#5F7A4F" stroke-width="3"><circle cx="32" cy="32" r="26"/><g class="needle"><path fill="#5F7A4F" stroke="none" d="M32 14 37 32 32 50 27 32z"/><circle cx="32" cy="32" r="3.4" fill="#F6F3EC" stroke="none"/></g></svg>
+    <h3 class="serif" id="loadmsg">On cherche le bon cap…</h3>
+    <p id="loadsub">Escapade prépare vos propositions</p>
+  </div>
+</div>
+<div id="toast" role="status"></div>
+
+<script>
+"use strict";
+/* ════════════════════ Icônes ════════════════════ */
+const SV = (inner) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
+const I = {
+  home:    SV(`<path d="M4 11.4 12 4.6l8 6.8"/><path d="M6.4 10.2v9.3h11.2v-9.3"/>`),
+  compass: SV(`<circle cx="12" cy="12" r="8.6"/><path fill="currentColor" stroke="none" d="M12 6.6 13.9 12 12 17.4 10.1 12z"/>`),
+  spark:   SV(`<path fill="currentColor" stroke="none" d="M11 4.8l1.5 4.6 4.7 1.6-4.7 1.6L11 17.2l-1.5-4.6-4.7-1.6 4.7-1.6z"/><path d="M18.4 4.2v3.2M16.8 5.8H20"/>`),
+  heartO:  SV(`<path d="M12 20.2C7.2 16.7 3.6 13.5 3.6 10a4.5 4.5 0 0 1 8.4-2.2A4.5 4.5 0 0 1 20.4 10c0 3.5-3.6 6.7-8.4 10.2z"/>`),
+  heartF:  SV(`<path fill="currentColor" d="M12 20.2C7.2 16.7 3.6 13.5 3.6 10a4.5 4.5 0 0 1 8.4-2.2A4.5 4.5 0 0 1 20.4 10c0 3.5-3.6 6.7-8.4 10.2z"/>`),
+  users:   SV(`<circle cx="9" cy="8.4" r="3.1"/><path d="M3.6 19.2c.5-3.1 2.6-4.8 5.4-4.8s4.9 1.7 5.4 4.8"/><circle cx="16.6" cy="9.4" r="2.4"/><path d="M16 14.6c2.4.2 4 1.7 4.5 4.2"/>`),
+  chev:    SV(`<path d="M9.5 6 15.5 12 9.5 18"/>`),
+  back:    SV(`<path d="M14.5 6 8.5 12 14.5 18"/>`),
+  ext:     SV(`<path d="M13.5 5H19v5.5M19 5l-8.5 8.5"/><path d="M16.5 13.5V19h-12V7H10"/>`),
+  plus:    SV(`<path d="M12 5.5v13M5.5 12h13"/>`),
+  trash:   SV(`<path d="M5 7h14M9.5 7V5h5v2M7.2 7l.9 12.5h7.8L16.8 7"/><path d="M10.4 10.5v5.8M13.6 10.5v5.8"/>`),
+  pin:     SV(`<path d="M12 21s-6.4-5.6-6.4-10a6.4 6.4 0 1 1 12.8 0C18.4 15.4 12 21 12 21z"/><circle cx="12" cy="10.8" r="2.3"/>`),
+  clock:   SV(`<circle cx="12" cy="12" r="8.3"/><path d="M12 7.8v4.4l2.9 1.8"/>`)
+};
+
+/* ════════════════════ Données de référence ════════════════════ */
+const CATS = [
+ {id:"nature",  em:"🌳", label:"Nature & plein air", subs:[{k:"envie", label:"Envie", opts:["Balade","Randonnée","Pique-nique","Parc & jardin","Bord de l'eau"]}]},
+ {id:"resto",   em:"🍽️", label:"Restaurant", subs:[{k:"gamme", label:"Gamme", opts:["€","€€","€€€","€€€€"]},{k:"cuisine", label:"Cuisine", opts:["Française","Italienne","Asiatique","Orientale","Indienne","Américaine","Fruits de mer","Végétarienne"]}]},
+ {id:"theatre", em:"🎭", label:"Théâtre & spectacles", subs:[{k:"genre", label:"Genre", opts:["Humour / one-man-show","Comédie","Drame & classique","Café-théâtre","Spectacle familial"]}]},
+ {id:"cinema",  em:"🎬", label:"Cinéma", subs:[{k:"genre", label:"Genre", opts:["Animation","Comédie","Action & aventure","Drame","Familial"]},{k:"version", label:"Version", opts:["VF","VO","Peu importe"]}]},
+ {id:"musee",   em:"🖼️", label:"Musée & expo", subs:[{k:"theme", label:"Thème", opts:["Art","Histoire","Sciences & nature","Adapté aux enfants"]}]},
+ {id:"concert", em:"🎵", label:"Concert & musique", subs:[{k:"style", label:"Style", opts:["Pop / rock","Classique","Jazz","Électro","Variété"]}]},
+ {id:"sport",   em:"🏸", label:"Activité sportive", subs:[{k:"mode", label:"Pratiquer ou regarder", opts:["Faire du sport","Voir un match"]},{k:"activite", label:"Activité", opts:["Piscine","Patinoire","Bowling","Accrobranche","Escalade","Autre"]}]},
+ {id:"loisirs", em:"🎢", label:"Parc & loisirs", subs:[{k:"type", label:"Type", opts:["Parc d'attractions","Zoo & aquarium","Escape game","Laser game","Mini-golf"]}]},
+ {id:"cafe",    em:"☕", label:"Bar & café", subs:[]},
+ {id:"shopping",em:"🛍️", label:"Marché & shopping", subs:[]}
+];
+const WHENS  = ["Aujourd'hui","Demain","Ce week-end","Choisir une date"];
+const MOMENTS= ["Matin","Après-midi","Soirée","Journée entière"];
+const DUREES = ["1-2 h","Demi-journée","Journée","Soirée"];
+const TRANSPORTS = [["pied","🚶 À pied"],["velo","🚲 Vélo"],["voiture","🚗 Voiture"],["tc","🚌 Transports en commun"]];
+const INTERESTS = ["Nature","Animaux","Randonnée","Sport","Foot","Vélo","Cuisine & restos","Art & expos","Musique","Concerts","Cinéma","Théâtre","Lecture","Jeux vidéo","Histoire","Sciences","Sensations fortes","Shopping","Farniente","Photo"];
+const AVCOLORS = ["#5F7A4F","#B0723F","#4F6E7A","#8A5F7A","#7A9C6B","#C08A4A","#5E8E86","#9A6B5E"];
+
+/* ════════════════════ Données de démonstration ════════════════════ */
+const TFACT  = { voiture:1, tc:1.4, velo:2.2, pied:4 };
+const TSHORT = { voiture:"voiture", tc:"transports", velo:"vélo", pied:"à pied" };
+const TLONG  = { voiture:"voiture", tc:"transports en commun", velo:"vélo", pied:"à pied" };
+function travelFor(minCar){
+  const allowed = S.search.transports.length ? S.search.transports : ["voiture","tc"];
+  let best=null;
+  allowed.forEach(m=>{ const t=Math.round((minCar||20)*TFACT[m]); if(!best||t<best.t) best={t,m}; });
+  return best;
+}
+
+function nameList(){
+  const n = S.search.who.map(i => (S.profiles[i]||{}).name).filter(Boolean);
+  if(!n.length) return "votre tribu";
+  if(n.length===1) return n[0];
+  return n.slice(0,-1).join(", ") + " et " + n[n.length-1];
+}
+function mockResults(){
+  const s=S.search, w=nameList();
+  const R = [
+   {t:"Balade au bord de l'eau + déjeuner à L'Auberge des Saules", cats:["nature","resto"], met:["☀️","22°"],
+    desc:"Boucle facile de 4 km le long de la rivière, puis table de campagne réputée pour sa cuisine du marché en terrasse ombragée.",
+    why:`Un combo doux qui coche « nature » et « bonne table » — parfait pour ${w}.`,
+    lieu:"Vallée des Saules", minCar:25, prix:"≈ 70 € pour tous", tags:["balade","bord de l'eau","française","€€"], score:96},
+   {t:"« Les Étoiles de papier » — spectacle familial + crêperie", cats:["theatre","resto"], met:["⛅","20°"],
+    desc:"Théâtre d'ombres et de marionnettes salué par le public, suivi d'une crêperie artisanale à deux rues de la salle.",
+    why:`Le spectacle est conseillé dès 5 ans : toute la tribu peut en profiter, ${w} en tête.`,
+    lieu:"Théâtre de la Passerelle", minCar:13, prix:"12–16 € / pers.", tags:["spectacle familial","€"], score:93},
+   {t:"Musée des curiosités naturelles + goûter au jardin", cats:["musee","cafe"], met:["⛅","20°"],
+    desc:"Parcours interactif sur la faune locale (2 h environ), squelettes géants et salle tactile, salon de thé dans la cour.",
+    why:`Les manipulations et jeux du parcours plaisent autant aux petits qu'aux grands curieux comme ${w}.`,
+    lieu:"Musée des Trois Rivières", minCar:22, prix:"Gratuit −12 ans", tags:["sciences & nature","adapté aux enfants"], score:90},
+   {t:"Accrobranche « Les Cimes » — demi-journée dans les arbres", cats:["sport","nature"], met:["☀️","23°"],
+    desc:"7 parcours du vert au noir, tyrolienne de 180 m au-dessus de l'étang, aire de pique-nique sur place.",
+    why:`Une bonne dose de sensations en pleine nature, dimensionnée pour ${w}.`,
+    lieu:"Forêt du Grand Chêne", minCar:35, prix:"14–24 € / pers.", tags:["accrobranche","faire du sport"], score:88},
+   {t:"Marché des créateurs + pause chez le torréfacteur", cats:["shopping","cafe"], met:["☀️","21°"],
+    desc:"Une quarantaine d'artisans locaux (céramique, illustration, savonnerie), puis café de spécialité et chocolat chaud maison.",
+    why:`Flânerie sans contrainte d'horaire : idéal si ${w} aime prendre son temps.`,
+    lieu:"Halle du Vieux Bourg", minCar:7, prix:"Entrée libre", tags:[], score:85},
+   {t:"Ciné « Le Grand Écran » — séance animation + pizzeria", cats:["cinema","resto"], met:["🌧️","18°"],
+    desc:"La nouveauté animation du moment sur grand écran, puis four à bois et pizzas généreuses juste en face.",
+    why:`Le plan refuge parfait si la météo se gâte — ${w} reste au sec.`,
+    lieu:"Centre-ville", minCar:9, prix:"8–11 € la place", tags:["animation","familial","italienne","vf"], score:83},
+   {t:"Mini-golf du Lac + glace artisanale", cats:["loisirs"], met:["☀️","22°"],
+    desc:"18 pistes rétro au bord de l'eau, kiosque à glaces turbinées sur place, transats pour les spectateurs.",
+    why:`Compétition bon enfant, accessible à tous les âges de ${w}.`,
+    lieu:"Base de loisirs du Lac", minCar:20, prix:"6 € / pers.", tags:["mini-golf"], score:80},
+   {t:"Jardin remarquable du Clos Margot — pique-nique champêtre", cats:["nature"], met:["☀️","23°"],
+    desc:"Roseraie, potager ancien et grande prairie autorisée au pique-nique ; visite guidée à 15 h le week-end.",
+    why:`Un décor superbe pour souffler, et de l'espace pour que ${w} se dégourdisse.`,
+    lieu:"Clos Margot", minCar:28, prix:"5 €, gratuit −10 ans", tags:["pique-nique","parc & jardin"], score:78},
+   {t:"Concert acoustique au kiosque du parc", cats:["concert","nature"], met:["⛅","21°"],
+    desc:"Trio folk en plein air en fin d'après-midi, buvette associative, plaids bienvenus sur la pelouse.",
+    why:`Ambiance détendue et gratuite — ${w} peut arriver et repartir librement.`,
+    lieu:"Grand parc municipal", minCar:3, prix:"Gratuit", tags:["pop / rock","variété"], score:75},
+   {t:"La Petite Arche — ferme et zoo de proximité", cats:["loisirs","nature"], met:["☀️","22°"],
+    desc:"Nourrissage des chèvres à 11 h et 16 h, mini-ferme pédagogique, sentier des rapaces (1,5 km).",
+    why:`Le contact direct avec les animaux, souvent le grand souvenir des sorties de ${w}.`,
+    lieu:"Plateau de la Garenne", minCar:30, prix:"9 € / pers.", tags:["zoo & aquarium"], score:73},
+   {t:"Match de handball — le club local reçoit son derby", cats:["sport"], met:["⛅","19°"],
+    desc:"Ambiance tribune garantie à la halle des sports : derby régional, buvette du club et animations pour les enfants à la mi-temps.",
+    why:`L'énergie d'un vrai match à vivre en tribune — de quoi faire vibrer ${w}.`,
+    lieu:"Halle des sports municipale", minCar:6, prix:"5 €, gratuit −12 ans", tags:["voir un match"], score:82},
+   {t:"Expo « Couleurs sauvages » à la galerie du centre", cats:["musee"], met:["🌧️","17°"],
+    desc:"Quarante toiles et photographies grand format sur la faune européenne, parcours audio de 45 minutes inclus.",
+    why:`Une parenthèse artistique au sec, à hauteur de ${w}.`,
+    lieu:"Galerie du Centre", minCar:11, prix:"7 €, gratuit −18 ans", tags:["art"], score:76},
+   {t:"Rooftop « Le Perchoir du Marché » au coucher du soleil", cats:["cafe"], met:["☀️","24°"],
+    desc:"Terrasse perchée avec vue dégagée, limonades maison et planches à partager jusqu'à 22 h.",
+    why:`Le spot détente idéal pour finir la journée en douceur avec ${w}.`,
+    lieu:"Toits du marché couvert", minCar:3, prix:"À la carte", tags:["soirée"], score:74},
+   {t:"Atelier poterie découverte chez « Terre & Tour »", cats:["loisirs"], met:["🌧️","18°"],
+    desc:"Initiation au tour de potier en petit groupe ; chacun repart avec sa création, cuisson comprise.",
+    why:`Une activité créative main dans la main, calibrée pour ${w}.`,
+    lieu:"Atelier Terre & Tour", minCar:19, prix:"18 € / pers.", tags:[], score:72}
+  ];
+  const subVals = Object.values(s.subs||{}).flatMap(g=>Object.values(g).flat()).map(x=>String(x).toLowerCase());
+  const seed = hash(JSON.stringify([s.cats,s.subs,s.when,s.date,s.moment,s.duree,s.transports,S.lastMode]));
+  const scored = R.map((r,i)=>{
+    let sc = r.score;
+    const hit = r.cats.filter(c=>s.cats.includes(c)).length;
+    sc += hit*12;
+    if(S.lastMode!=="quick" && s.cats.length && !hit) sc -= 30;
+    (r.tags||[]).forEach(t=>{ if(subVals.some(v=>v.includes(t)||t.includes(v))) sc += 9; });
+    sc += (seed >>> (i%13)) % 6;
+    const tr = travelFor(r.minCar);
+    return { ...r, _s:sc, _t:tr.t, acces:`${tr.t} min · ${TSHORT[tr.m]}` };
+  }).sort((a,b)=>b._s-a._s);
+  const within = scored.filter(r=>r._t <= s.maxTime).slice(0,10);
+  return within.map((r,i)=>({ ...r, id:"demo-"+i, q:r.lieu||r.t }));
+}
+function mockEvents(){
+  return [
+   {off:2,  em:"🎪", t:"Fête des lanternes au grand parc",        sub:"Déambulation lumineuse dès la tombée de la nuit", lieu:"Grand parc municipal", aff:["photo","nature"], dist:"à 2,1 km", prix:"Gratuit"},
+   {off:4,  em:"🧺", t:"Brocante du canal",                        sub:"120 exposants le long des quais, dès 8 h",        lieu:"Quais du canal", aff:["shopping","histoire"], dist:"à 3,4 km", prix:"Entrée libre"},
+   {off:7,  em:"🎬", t:"Ciné plein air — soirée familles",         sub:"Film d'animation sur écran géant, transats fournis", lieu:"Esplanade de l'hôtel de ville", aff:["cinéma"], dist:"à 1,8 km", prix:"Gratuit"},
+   {off:10, em:"🍜", t:"Festival street-food du week-end",         sub:"20 cuisines du monde, coin enfants et concerts",  lieu:"Halle du Vieux Bourg", aff:["cuisine & restos"], dist:"à 4,2 km", prix:"Entrée libre"},
+   {off:14, em:"🏺", t:"Atelier poterie parents-enfants",          sub:"Initiation au tour, places limitées, dès 6 ans",  lieu:"Atelier des Trois Rivières", aff:["art & expos"], dist:"à 2,9 km", prix:"Dès 12 €"},
+   {off:18, em:"🌌", t:"Nuit des étoiles au belvédère",            sub:"Télescopes en accès libre avec le club d'astronomie", lieu:"Belvédère des Coteaux", aff:["sciences","nature"], dist:"à 6,5 km", prix:"Gratuit"},
+   {off:23, em:"🏃", t:"Course colorée familiale (5 km)",          sub:"Parcours festif ouvert à tous, poudres colorées", lieu:"Base de loisirs du Lac", aff:["sport"], dist:"à 5,1 km", prix:"Dès 8 €"},
+   {off:27, em:"🎨", t:"Marché nocturne des créateurs",            sub:"Artisanat local, ateliers démo et guinguette",    lieu:"Place du marché", aff:["shopping","art & expos"], dist:"à 3,0 km", prix:"Entrée libre"}
+  ].map((e,i)=>({ ...e, id:"ev-"+i, kind:"event", q:e.t+" "+(e.lieu||"") }));
+}
+
+/* ════════════════════ État & stockage ════════════════════ */
+const store = {
+  get(){ try{ return JSON.parse(localStorage.getItem("escapade_v1")) || {}; }catch(e){ return {}; } },
+  set(d){ try{ localStorage.setItem("escapade_v1", JSON.stringify(d)); }catch(e){} }
+};
+const saved = store.get();
+const S = {
+  tab:"home", view:null,
+  profiles: saved.profiles || [],
+  favs:     saved.favs     || [],
+  history:  saved.history  || [],
+  newsOff:[], favTab:"favs", searchMode:"full", searchView:"form", lastMode:"full",
+  editing:null, tmp:null,
+  search:{ who:[], cats:[], subs:{}, when:"Aujourd'hui", date:"", moment:"Après-midi",
+           duree:"Demi-journée", transports:[], maxTime:45, budgetOn:false, budget:100 },
+  results:null
+};
+function persist(){ store.set({ profiles:S.profiles, favs:S.favs, history:S.history }); }
+
+/* ════════════════════ Petits utilitaires ════════════════════ */
+const esc = s => String(s==null?"":s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const hash = s => { let h=0; for(const c of String(s)) h=(h*31+c.charCodeAt(0))>>>0; return h; };
+const avColor = n => AVCOLORS[hash(n)%AVCOLORS.length];
+const av = (p,cls) => `<span class="av ${cls||""}" style="background:${avColor(p.name)}">${esc((p.name||"?").trim().charAt(0).toUpperCase())}</span>`;
+function toast(msg){
+  const t=document.getElementById("toast");
+  t.textContent=msg; t.classList.add("on");
+  clearTimeout(t._h); t._h=setTimeout(()=>t.classList.remove("on"),2100);
+}
+function frDate(d){
+  const s = d.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"});
+  return s.charAt(0).toUpperCase()+s.slice(1);
+}
+function profSum(p){
+  const bits=[]; if(p.age) bits.push(p.age+" ans");
+  const g=(p.tags||[]).slice(0,3).join(", "); if(g) bits.push(g);
+  return bits.join(" · ") || "Profil à compléter";
+}
+
+/* ════════════════════ Navigation ════════════════════ */
+const NAV = [["home","Accueil",I.home],["search","Recherche",I.compass],["news","Quoi de neuf",I.spark],["favs","Favoris",I.heartO],["profiles","Profils",I.users]];
+function renderNav(){
+  document.getElementById("nav").innerHTML = NAV.map(([id,label,ic]) =>
+    `<button class="tab ${S.tab===id?"on":""}" data-act="tab" data-v="${id}" aria-label="${label}">${ic}<span>${label}</span><span class="dot"></span></button>`
+  ).join("");
+}
+function go(tab){
+  S.tab=tab;
+  S.view = (tab==="search" && S.results && S.searchView==="results") ? "results" : null;
+  render();
+}
+function render(){
+  renderNav();
+  let h="";
+  if(S.view==="settings")         h=vSettings();
+  else if(S.view==="results")     h=vResults();
+  else if(S.view==="profileForm") h=vProfileForm();
+  else h=({home:vHome,search:vSearch,news:vNews,favs:vFavs,profiles:vProfiles})[S.tab]();
+  const m=document.getElementById("view");
+  m.innerHTML=h;
+  m.style.animation="none"; void m.offsetHeight; m.style.animation="";
+  window.scrollTo(0,0);
+}
+
+/* ════════════════════ Écran Accueil ════════════════════ */
+function vHome(){
+  const p=S.profiles;
+  const tribe = p.length
+    ? `<div class="card tribe"><span class="avs">${p.slice(0,5).map(x=>av(x)).join("")}</span>
+       <span>${p.length} profil${p.length>1?"s":""} dans la tribu</span>
+       <button class="lnk" data-act="tab" data-v="profiles">Gérer</button></div>`
+    : `<div class="card tribe"><span class="hint" style="flex:1">Ajoute ta tribu pour des idées vraiment sur mesure.</span>
+       <button class="lnk" data-act="tab" data-v="profiles">Créer un profil</button></div>`;
+  return `
+  <p class="hello">${frDate(new Date())}</p>
+  <h1 class="hero">On s'échappe <b>où</b>, aujourd'hui&nbsp;?</h1>
+  <button class="card bigact" data-act="tab" data-v="search">
+    <span class="ic">${I.compass}</span>
+    <span><h3 class="serif">Trouver une sortie</h3><p>Qui, quoi, quand — Escapade compose le reste.</p></span>
+    <span class="go">${I.chev}</span>
+  </button>
+  <button class="card bigact" data-act="tab" data-v="news">
+    <span class="ic">${I.spark}</span>
+    <span><h3 class="serif">Quoi de neuf autour de moi&nbsp;?</h3><p>Événements et bons plans des 30 prochains jours.</p></span>
+    <span class="go">${I.chev}</span>
+  </button>
+  <p class="eyebrow">Ta tribu</p>
+  ${tribe}`;
+}
+
+/* ════════════════════ Écran Profils ════════════════════ */
+function vProfiles(){
+  if(!S.profiles.length) return `
+    <p class="eyebrow">Ta tribu</p>
+    <div class="card empty"><div class="em">🧭</div>
+      <h3 class="serif">Personne à bord pour l'instant</h3>
+      <p>Ajoute chaque membre — âge, goûts, choses à éviter — pour qu'Escapade vise juste à chaque fois.</p>
+      <button class="btn sm" data-act="newP" style="margin:0 auto">${I.plus} Ajouter un profil</button>
+    </div>`;
+  return `
+    <p class="eyebrow">Ta tribu <small>${S.profiles.length} profil${S.profiles.length>1?"s":""}</small></p>
+    ${S.profiles.map((p,i)=>`
+      <button class="card prow" data-act="editP" data-v="${i}">
+        ${av(p)}
+        <span><span class="nm">${esc(p.name)}</span><br><span class="dt">${esc(profSum(p))}</span></span>
+        <span class="go">${I.chev}</span>
+      </button>`).join("")}
+    <button class="btn subtle" data-act="newP">${I.plus} Ajouter un profil</button>`;
+}
+
+function openProfile(i){
+  S.editing=i;
+  const p = i>=0 ? S.profiles[i] : null;
+  S.tmp = { name:p?p.name:"", age:p?p.age:"", tags:p?[...(p.tags||[])]:[], free:p?(p.free||""):"", avoid:p?(p.avoid||""):"" };
+  S.view="profileForm"; render();
+}
+function vProfileForm(){
+  const t=S.tmp, neuf=S.editing<0;
+  return `
+  <div class="backrow">
+    <button class="iconbtn" data-act="backProfiles" aria-label="Retour">${I.back}</button>
+    <h2 class="serif">${neuf?"Nouveau profil":"Modifier "+esc(t.name||"le profil")}</h2>
+  </div>
+  <div class="field"><label for="pf-name">Prénom</label>
+    <input type="text" id="pf-name" data-bind="name" value="${esc(t.name)}" placeholder="Ex. Léa" autocomplete="off"></div>
+  <div class="field"><label for="pf-age">Âge</label>
+    <input type="number" id="pf-age" data-bind="age" value="${esc(t.age)}" min="0" max="120" placeholder="Ex. 8" style="max-width:130px"></div>
+  <div class="field"><label>Centres d'intérêt</label>
+    <div class="chips">${INTERESTS.map(x=>`<button class="chip ${t.tags.includes(x)?"on":""}" data-act="tagT" data-v="${esc(x)}">${x}</button>`).join("")}</div>
+    <div class="spacer"></div>
+    <input type="text" data-bind="free" value="${esc(t.free)}" placeholder="Autres passions, séparées par des virgules"></div>
+  <div class="field"><label for="pf-avoid">À éviter / n'aime pas</label>
+    <textarea id="pf-avoid" data-bind="avoid" placeholder="Ex. la foule, les frites, marcher longtemps…">${esc(t.avoid)}</textarea></div>
+  <button class="btn" data-act="saveP">Enregistrer le profil</button>
+  ${neuf?"":`<div class="spacer"></div><button class="btn danger" data-act="delP">${I.trash} Supprimer ce profil</button>`}`;
+}
+function saveProfile(){
+  const t=S.tmp;
+  if(!t.name.trim()){ toast("Un prénom, et c'est bon !"); return; }
+  const p={ name:t.name.trim(), age:String(t.age).trim(), tags:t.tags, free:t.free.trim(), avoid:t.avoid.trim() };
+  if(S.editing>=0) S.profiles[S.editing]=p; else S.profiles.push(p);
+  persist(); S.view=null; render();
+  toast(`Profil de ${p.name} enregistré`);
+}
+
+/* ════════════════════ Écran Réglages ════════════════════ */
+function vSettings(){
+  const row=(em,t,d,soon)=>`<div class="setrow"><span style="font-size:20px">${em}</span>
+    <span><span class="t">${t}</span><br><span class="d">${d}</span></span>${soon?'<span class="soon">Bientôt</span>':""}</div>`;
+  return `
+  <div class="backrow"><button class="iconbtn" data-act="backHome" aria-label="Retour">${I.back}</button><h2 class="serif">Réglages</h2></div>
+  <div class="card">
+    ${row("🤖","Moteur IA","Tes deux moteurs, Claude et Gemini — branchement à l'étape suivante",true)}
+    ${row("📍","Ma position","Géolocalisation pour les distances et la veille",true)}
+    ${row("🌦️","Météo","Prévisions Open-Meteo intégrées aux propositions",true)}
+  </div>
+  <p class="eyebrow">Données</p>
+  <button class="btn danger" data-act="reset">${I.trash} Réinitialiser l'application</button>
+  <div class="spacer"></div>
+  <p class="hint" style="text-align:center">Escapade v0.4 — version de démonstration (coquille)</p>`;
+}
+
+/* ════════════════════ Écran Recherche ════════════════════ */
+function vSearch(){
+  const s=S.search;
+  const seg=`<div class="seg" style="margin:6px 0 14px"><button class="${S.searchMode==="quick"?"on":""}" data-act="sMode" data-v="quick">⚡ Rapide</button><button class="${S.searchMode==="full"?"on":""}" data-act="sMode" data-v="full">Sur mesure</button></div>`;
+  if(S.searchMode==="quick") return seg + vQuick(s);
+  const who = S.profiles.length
+    ? `<div class="chips">${S.profiles.map((p,i)=>`<button class="chip ${s.who.includes(i)?"on":""}" data-act="sWho" data-v="${i}">${av(p,"")}${esc(p.name)}</button>`).join("")}</div>`
+    : `<div class="card tribe"><span class="hint" style="flex:1">Aucun profil pour l'instant — la recherche marchera quand même, mais en mode général.</span>
+       <button class="lnk" data-act="tab" data-v="profiles">Créer</button></div>`;
+  const cats = `<div class="catgrid">${CATS.map(c=>`<button class="cat ${s.cats.includes(c.id)?"on":""}" data-act="sCat" data-v="${c.id}"><span class="em">${c.em}</span>${c.label}</button>`).join("")}</div>`;
+  const subs = s.cats.map(id=>{
+    const c=CATS.find(x=>x.id===id);
+    if(!c || !c.subs.length) return "";
+    return `<div class="subbox">${c.subs.map(g=>{
+      const sel=(s.subs[id]&&s.subs[id][g.k])||[];
+      return `<p class="sublabel">${c.em} ${c.label} — ${g.label}</p>
+        <div class="chips">${g.opts.map(o=>`<button class="chip ${sel.includes(o)?"on":""}" data-act="sSub" data-c="${id}" data-k="${g.k}" data-v="${esc(o)}">${o}</button>`).join("")}</div>`;
+    }).join("")}</div>`;
+  }).join("");
+  const one = (act,arr,cur) => `<div class="chips">${arr.map(x=>`<button class="chip ${cur===x?"on":""}" data-act="${act}" data-v="${esc(x)}">${x}</button>`).join("")}</div>`;
+  return seg + `
+  <p class="eyebrow">Qui part en escapade&nbsp;?</p>${who}
+  <p class="eyebrow">Quel genre de sortie&nbsp;? <small>combine librement</small></p>${cats}${subs}
+  <p class="eyebrow">Quand&nbsp;?</p>
+  ${one("sWhen",WHENS,s.when)}
+  ${s.when==="Choisir une date"?`<input type="date" data-bind="sdate" value="${esc(s.date)}">`:""}
+  <div class="spacer"></div>${one("sMoment",MOMENTS,s.moment)}
+  <p class="eyebrow">Quelle durée&nbsp;?</p>${one("sDuree",DUREES,s.duree)}
+  <p class="eyebrow">Comment on se déplace&nbsp;? <small>hybride possible</small></p>
+  <div class="chips">${TRANSPORTS.map(([id,l])=>`<button class="chip ${s.transports.includes(id)?"on":""}" data-act="sTrans" data-v="${id}">${l}</button>`).join("")}</div>
+  <p class="eyebrow">Temps de trajet max</p>
+  <div class="range">${I.clock}<input type="range" min="15" max="90" step="5" value="${s.maxTime}" data-bind="time" aria-label="Temps de trajet maximum"><output id="o-time">${s.maxTime} min</output></div>
+  <p class="hint" style="margin-top:8px">⏱ Évalué : ${s.transports.length ? s.transports.map(t=>TLONG[t]).join(" ou ") : "voiture ou transports en commun (par défaut)"}.</p>
+  <p class="eyebrow">Budget de la sortie <small>optionnel</small></p>
+  <div class="switchrow"><span>Fixer un budget max</span><button class="sw ${s.budgetOn?"on":""}" data-act="sBudT" role="switch" aria-checked="${s.budgetOn}" aria-label="Fixer un budget max"></button></div>
+  ${s.budgetOn?`<div class="spacer"></div><div class="range">💶<input type="range" min="20" max="400" step="10" value="${s.budget}" data-bind="budget" aria-label="Budget maximum"><output id="o-budget">${s.budget} €</output></div>`:""}
+  <div style="height:26px"></div>
+  <button class="btn" data-act="goSearch">OK, trouve-nous des sorties&nbsp;!</button>`;
+}
+
+function vQuick(s){
+  const one=(act,arr,cur)=>`<div class="chips">${arr.map(x=>`<button class="chip ${cur===x?"on":""}" data-act="${act}" data-v="${esc(x)}">${x}</button>`).join("")}</div>`;
+  const who = S.profiles.length
+    ? `Pour toute la tribu — ${S.profiles.map(p=>esc(p.name)).join(", ")}.`
+    : `Aucun profil pour l'instant : la sélection sera générale.`;
+  return `
+  <div class="card" style="padding:15px 16px;margin:2px 0 4px">
+    <p style="font-size:14.5px;line-height:1.5">⚡ <b>Recherche rapide.</b> Donne juste la date et la durée — Escapade compose le reste d'après les goûts des profils.</p>
+    <p class="hint" style="margin-top:6px">${who}</p>
+  </div>
+  <p class="eyebrow">Quand&nbsp;?</p>
+  ${one("sWhen",WHENS,s.when)}
+  ${s.when==="Choisir une date"?`<input type="date" data-bind="sdate" value="${esc(s.date)}">`:""}
+  <p class="eyebrow">Quelle durée&nbsp;?</p>${one("sDuree",DUREES,s.duree)}
+  <div style="height:26px"></div>
+  <button class="btn" data-act="goQuick">⚡ OK, surprends-nous&nbsp;!</button>`;
+}
+
+function catLabel(id){ const c=CATS.find(x=>x.id===id); return c?c.label:id; }
+function searchSummary(){
+  const s=S.search;
+  const t = s.when==="Choisir une date" && s.date
+    ? new Date(s.date+"T12:00").toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"})
+    : s.when;
+  if(S.lastMode==="quick") return `⚡ Sélection Escapade · ${t} · ${s.duree}`;
+  return `${s.cats.map(catLabel).join(" + ")||"Sortie libre"} · ${t} (${s.moment.toLowerCase()}) · ${s.duree}`;
+}
+function launchSearch(mode){
+  const s=S.search;
+  if(mode!=="quick" && !s.cats.length){ toast("Choisis au moins un type de sortie"); return; }
+  if(mode==="quick") s.who=S.profiles.map((_,i)=>i);
+  S.lastMode=mode||"full";
+  const L=document.getElementById("loader"), M=document.getElementById("loadmsg");
+  const msgs=["On cherche le bon cap…","Lecture du ciel du jour…","Repérage des pépites autour de vous…"];
+  let k=0; M.textContent=msgs[0]; L.classList.add("on");
+  const iv=setInterval(()=>{ k=(k+1)%msgs.length; M.textContent=msgs[k]; },850);
+  setTimeout(()=>{
+    clearInterval(iv); L.classList.remove("on");
+    S.results=mockResults();
+    S.history.unshift({ ts:Date.now(), who:nameList(), sum:searchSummary() });
+    S.history=S.history.slice(0,20); persist();
+    S.searchView="results"; S.view="results"; render();
+  },2100);
+}
+
+/* ════════════════════ Écran Résultats ════════════════════ */
+function rankIcon(i){
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="8.6"/><g transform="rotate(${(i*36)%360} 12 12)"><path fill="currentColor" stroke="none" d="M12 6.6 13.9 12 12 17.4 10.1 12z"/></g></svg>`;
+}
+function resCard(r,idx){
+  const fav = S.favs.some(f=>f.id===r.id);
+  return `<article class="card res">
+    <div class="top">
+      <span class="rank">${rankIcon(idx==null?3:idx)}${idx==null?"":`<i>N°${idx+1}</i>`}</span>
+      <h3 class="serif">${esc(r.t)}</h3>
+      <button class="favbtn ${fav?"on":""}" data-act="fav" data-v="${r.id}" aria-label="${fav?"Retirer des favoris":"Ajouter aux favoris"}">${fav?I.heartF:I.heartO}</button>
+    </div>
+    <div class="tagrow">${r.cats.map(c=>`<span class="tag">${catLabel(c)}</span>`).join("")}<span class="tag meteo">${r.met[0]} ${r.met[1]}</span></div>
+    <p class="desc">${esc(r.desc)}</p>
+    <div class="why"><b>Pourquoi pour vous&nbsp;:</b> ${esc(r.why)}</div>
+    <div class="meta"><span>${I.pin}${esc(r.lieu)}</span><span>${I.clock}${esc(r.acces)}</span><span>💶 ${esc(r.prix)}</span></div>
+    <a class="linkbtn" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.q||r.lieu||r.t)}">${I.pin} Voir sur Google Maps</a>
+  </article>`;
+}
+function vResults(){
+  const list=S.results||[];
+  const body = list.length
+    ? list.map((r,i)=>resCard(r,i)).join("")
+    : `<div class="card empty"><div class="em">⏱</div><h3 class="serif">Rien ne rentre dans ce temps de trajet</h3>
+       <p>Élargis le curseur de trajet ou coche d'autres transports, puis relance.</p></div>`;
+  const note = list.length && list.length<10
+    ? `<p class="hint" style="margin:-6px 0 14px">${list.length} proposition${list.length>1?"s":""} dans le temps de trajet choisi — élargis le curseur ou les transports pour en voir plus.</p>`
+    : "";
+  return `
+  <div class="backrow"><button class="iconbtn" data-act="backSearch" aria-label="Retour à la recherche">${I.back}</button>
+    <div><h2 class="serif">Cap sur vos sorties</h2><p class="hint">${esc(searchSummary())}</p></div></div>
+  <div class="demo">🧪<span><b>Aperçu de démonstration.</b> Propositions et météo sont des exemples (lieux fictifs) ; les liens ouvrent Google Maps. Le vrai moteur IA — vraies adresses, vraie pertinence — se branche à la prochaine étape.</span></div>
+  ${note}${body}
+  <button class="btn ghost" data-act="backSearch">Modifier la recherche</button>`;
+}
+
+/* ════════════════════ Écran Quoi de neuf ════════════════════ */
+function eventsList(){ return mockEvents(); }
+function eventsRanked(){
+  const on = S.profiles.map((p,i)=>({p,i})).filter(x=>!S.newsOff.includes(x.i));
+  return eventsList().map(e=>{
+    let m=0, who="";
+    (e.aff||[]).forEach(a=>{
+      const h = on.find(x=>(x.p.tags||[]).some(t=>t.toLowerCase()===a));
+      if(h){ m++; if(!who) who=h.p.name; }
+    });
+    e._m=m; e.forName=who;
+    return e;
+  }).sort((a,b)=> b._m-a._m || a.off-b.off);
+}
+function evCard(e,frozen){
+  let day,mon;
+  if(frozen){ day=e.day; mon=e.mon; }
+  else{ const d=new Date(); d.setDate(d.getDate()+e.off); day=d.getDate(); mon=d.toLocaleDateString("fr-FR",{month:"short"}).replace(".",""); }
+  const fav=S.favs.some(f=>f.id===e.id);
+  const forWho = e.forName ? `<span class="tag">✨ Pensé pour ${esc(e.forName)}</span>` : "";
+  return `<article class="card ev">
+    <span class="evdate"><b>${day}</b><span>${mon}</span></span>
+    <span style="flex:1"><h3 class="serif">${e.em} ${esc(e.t)}</h3><p class="sub">${esc(e.sub)}</p>
+      <div class="tagrow"><span class="tag">📍 ${esc(e.lieu)} · ${esc(e.dist)}</span><span class="tag">${esc(e.prix)}</span>${forWho}</div>
+      <a class="evlink" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(e.lieu||e.t)}">${I.pin} Voir sur Google Maps</a></span>
+    <button class="favbtn ${fav?"on":""}" data-act="fav" data-v="${e.id}" aria-label="${fav?"Retirer des favoris":"Ajouter aux favoris"}">${fav?I.heartF:I.heartO}</button>
+  </article>`;
+}
+function vNews(){
+  const filt = S.profiles.length
+    ? `<div class="chips" style="margin-bottom:6px">${S.profiles.map((p,i)=>`<button class="chip ${S.newsOff.includes(i)?"":"on"}" data-act="nProf" data-v="${i}">${av(p,"")}${esc(p.name)}</button>`).join("")}</div>
+       <p class="hint" style="margin-bottom:14px">La sélection se réorganise selon les profils cochés — décoche pour élargir.</p>`
+    : `<p class="hint" style="margin-bottom:14px">Ajoute des profils pour une veille inspirée des goûts de ta tribu.</p>`;
+  const evs = eventsRanked().map(e=>evCard(e,false)).join("");
+  return `
+  <p class="eyebrow">Autour de vous <small>30 prochains jours</small></p>
+  ${filt}
+  <div class="demo">🧪<span><b>Veille de démonstration.</b> Événements d'exemple (les liens ouvrent Google Maps) — la vraie veille géolocalisée arrive avec le moteur IA.</span></div>
+  ${evs}`;
+}
+
+/* ════════════════════ Écran Favoris & Historique ════════════════════ */
+function vFavs(){
+  const seg=`<div class="seg">
+    <button class="${S.favTab==="favs"?"on":""}" data-act="favseg" data-v="favs">Favoris</button>
+    <button class="${S.favTab==="hist"?"on":""}" data-act="favseg" data-v="hist">Historique</button></div>`;
+  if(S.favTab==="favs"){
+    const body = S.favs.length ? S.favs.map(f=>f.kind==="event"?evCard(f,true):resCard(f,null)).join("")
+      : `<div class="card empty"><div class="em">💚</div><h3 class="serif">Rien de gardé pour l'instant</h3>
+         <p>Touche le cœur d'une proposition ou d'un événement pour le retrouver ici, prêt à ressortir.</p></div>`;
+    return `<p class="eyebrow">Vos pépites</p>${seg}${body}`;
+  }
+  const body = S.history.length
+    ? S.history.map(h=>{
+        const d=new Date(h.ts);
+        return `<div class="card hist"><p class="ts">${d.toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"})} · ${d.toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})} · ${esc(h.who)}</p><p class="sum">${esc(h.sum)}</p></div>`;
+      }).join("") + `<button class="btn subtle sm" data-act="clearHist" style="margin:6px auto 0">Effacer l'historique</button>`
+    : `<div class="card empty"><div class="em">🗺️</div><h3 class="serif">Aucune recherche pour l'instant</h3>
+       <p>Tes recherches lancées s'archiveront ici automatiquement.</p></div>`;
+  return `<p class="eyebrow">Vos pépites</p>${seg}${body}`;
+}
+function toggleFav(id){
+  const k=S.favs.findIndex(f=>f.id===id);
+  if(k>=0){ S.favs.splice(k,1); toast("Retiré des favoris"); persist(); render(); return; }
+  let r=(S.results||[]).find(x=>x.id===id);
+  if(!r && String(id).indexOf("ev-")===0){
+    const e=eventsList().find(x=>x.id===id);
+    if(e){
+      const d=new Date(); d.setDate(d.getDate()+e.off);
+      const rk=eventsRanked().find(x=>x.id===id);
+      r={ ...e, day:d.getDate(), mon:d.toLocaleDateString("fr-FR",{month:"short"}).replace(".",""),
+          forName: rk ? rk.forName : "" };
+    }
+  }
+  if(r){ S.favs.unshift({...r}); toast("Ajouté aux favoris 💚"); }
+  persist(); render();
+}
+
+/* ════════════════════ Interactions ════════════════════ */
+const togg=(arr,v)=>{ const i=arr.indexOf(v); if(i>=0)arr.splice(i,1); else arr.push(v); };
+document.addEventListener("click", e=>{
+  const b=e.target.closest("[data-act]"); if(!b) return;
+  const a=b.dataset.act, v=b.dataset.v, s=S.search;
+  if(a==="tab") go(v);
+  else if(a==="settings"){ S.view="settings"; render(); }
+  else if(a==="backHome"||a==="backProfiles"){ S.view=null; render(); }
+  else if(a==="backSearch"){ S.view=null; S.searchView="form"; render(); }
+  else if(a==="newP") openProfile(-1);
+  else if(a==="editP") openProfile(+v);
+  else if(a==="tagT"){ togg(S.tmp.tags,v); render(); }
+  else if(a==="saveP") saveProfile();
+  else if(a==="delP"){ if(confirm("Supprimer ce profil ?")){ S.profiles.splice(S.editing,1); persist(); S.view=null; render(); toast("Profil supprimé"); } }
+  else if(a==="reset"){ if(confirm("Tout effacer (profils, favoris, historique) ?")){ localStorage.removeItem("escapade_v1"); location.reload(); } }
+  else if(a==="sWho"){ togg(s.who,+v); render(); }
+  else if(a==="sCat"){ togg(s.cats,v); if(!s.cats.includes(v)) delete s.subs[v]; render(); }
+  else if(a==="sSub"){
+    const c=b.dataset.c,k=b.dataset.k;
+    s.subs[c]=s.subs[c]||{}; s.subs[c][k]=s.subs[c][k]||[];
+    if(k==="version") s.subs[c][k]=[v]; else togg(s.subs[c][k],v);
+    render();
+  }
+  else if(a==="sWhen"){ s.when=v; render(); }
+  else if(a==="sMoment"){ s.moment=v; render(); }
+  else if(a==="sDuree"){ s.duree=v; render(); }
+  else if(a==="sTrans"){ togg(s.transports,v); render(); }
+  else if(a==="sBudT"){ s.budgetOn=!s.budgetOn; render(); }
+  else if(a==="goSearch") launchSearch("full");
+  else if(a==="goQuick") launchSearch("quick");
+  else if(a==="sMode"){ S.searchMode=v; render(); }
+  else if(a==="fav") toggleFav(v);
+  else if(a==="favseg"){ S.favTab=v; render(); }
+  else if(a==="nProf"){ togg(S.newsOff,+v); render(); }
+  else if(a==="clearHist"){ if(confirm("Effacer tout l'historique ?")){ S.history=[]; persist(); render(); } }
+});
+document.addEventListener("input", e=>{
+  const b=e.target.dataset.bind; if(!b) return;
+  if(b==="name"||b==="age"||b==="free"||b==="avoid") S.tmp[b]=e.target.value;
+  else if(b==="sdate") S.search.date=e.target.value;
+  else if(b==="time"){ S.search.maxTime=+e.target.value; const o=document.getElementById("o-time"); if(o)o.textContent=S.search.maxTime+" min"; }
+  else if(b==="budget"){ S.search.budget=+e.target.value; const o=document.getElementById("o-budget"); if(o)o.textContent=S.search.budget+" €"; }
+});
+
+/* ════════════════════ Démarrage ════════════════════ */
+render();
+if("serviceWorker" in navigator && location.protocol.indexOf("http")===0){
+  navigator.serviceWorker.register("./sw.js").catch(()=>{});
+}
+</script>
+</body>
+</html>
