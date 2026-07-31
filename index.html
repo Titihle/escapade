@@ -441,7 +441,7 @@ const S = {
   history:  saved.history  || [],
   newsOff:[], favTab:"favs", searchMode:"full", searchView:"form", lastMode:"full",
   settings: Object.assign({gkey:"",ckey:"",pos:null,engine:"gemini"}, saved.settings||{}),
-  lastEngine:null, lastError:"", pendingRetry:false,
+  lastEngine:null, lastError:"", pendingRetry:false, lastFailedEngine:null,
   editing:null, tmp:null,
   search:{ who:[], cats:[], subs:{}, when:"Aujourd'hui", date:"", moment:"Après-midi",
            duree:"Demi-journée", transports:[], maxTime:45, budgetOn:false, budget:100 },
@@ -613,7 +613,7 @@ function vSettings(){
   <p class="eyebrow">Données</p>
   <button class="btn danger" data-act="reset">${I.trash} Réinitialiser l'application</button>
   <div class="spacer"></div>
-  <p class="hint" style="text-align:center">Escapade v0.6.2 — moteurs Gemini & Claude · météo Open-Meteo</p>`;
+  <p class="hint" style="text-align:center">Escapade v0.6.3 — moteurs Gemini & Claude · météo Open-Meteo</p>`;
 }
 async function testKey(kind){
   const isC = kind==="c";
@@ -702,6 +702,7 @@ async function geminiCall(promptText,useSearch){
     let msg="erreur "+r.status;
     if(r.status===400||r.status===403) msg="clé invalide ou non autorisée";
     if(r.status===429) msg="quota gratuit du jour atteint";
+    if(r.status>=500) msg="serveurs Gemini momentanément surchargés (erreur "+r.status+")";
     throw new Error(msg);
   }
   const data=await r.json();
@@ -729,7 +730,7 @@ async function claudeCall(promptText,useSearch){
     if(r.status===401) msg="clé Claude invalide";
     if(r.status===400) msg="requête refusée — crédits API épuisés ou clé incorrecte ?";
     if(r.status===429) msg="limite de débit atteinte — réessaie dans une minute";
-    if(r.status===529||r.status===503) msg="API Claude momentanément surchargée — réessaie";
+    if(r.status>=500) msg="API Claude momentanément surchargée (erreur "+r.status+")";
     try{ const j=await r.json(); if(j.error&&j.error.message) msg+=" · "+String(j.error.message).slice(0,90); }catch(e){}
     throw new Error(msg);
   }
@@ -747,6 +748,22 @@ function effectiveEngine(){
   if(c) return "claude";
   if(g) return "gemini";
   return null;
+}
+async function withRetry(fn){
+  const delays=[2000,5000];
+  for(let a=0;;a++){
+    try{ return await fn(); }
+    catch(e){
+      const m=String(e.message||"");
+      const net=/failed to fetch|networkerror|load failed/i.test(m);
+      if(net && document.visibilityState==="hidden") throw e;
+      const transient = net || /surcharg|erreur 50\d/i.test(m);
+      if(!transient || a>=delays.length) throw e;
+      const M=document.getElementById("loadmsg");
+      if(M) M.textContent="Serveurs surchargés — nouvel essai ("+(a+2)+"/"+(delays.length+1)+")…";
+      await sleep(delays[a]);
+    }
+  }
 }
 function normalizeProp(p,i,meteo){
   const ids=CATS.map(c=>c.id);
@@ -857,8 +874,8 @@ function launchSearch(mode){
   S.lastMode=mode||"full";
   runSearch();
 }
-async function runSearch(){
-  const eng=effectiveEngine();
+async function runSearch(force){
+  const eng = force || effectiveEngine();
   if(eng && !S.settings.pos){ toast("Indique d'abord ta position (Réglages)"); S.view="settings"; render(); return; }
   showLoader(eng?"ai":"demo", eng==="claude"?"Claude":"Gemini");
   if(eng) keepAwake(true);
@@ -870,10 +887,10 @@ async function runSearch(){
       const dateStr=targetDate();
       const meteo=await fetchWeather(dateStr).catch(()=>null);
       const prompt=buildPrompt(dateStr,meteo);
-      const raw = eng==="claude" ? await claudeSearch(prompt) : await geminiSearch(prompt);
+      const raw = await withRetry(()=> eng==="claude" ? claudeSearch(prompt) : geminiSearch(prompt));
       const props=raw.slice(0,12).map((p,i)=>normalizeProp(p,i,meteo));
       if(!props.length) throw new Error("aucune proposition reçue");
-      S.results=props; S.lastEngine=eng;
+      S.results=props; S.lastEngine=eng; S.lastFailedEngine=null;
     }
     S.history.unshift({ ts:Date.now(), who:nameList(), sum:searchSummary() });
     S.history=S.history.slice(0,20); persist();
@@ -883,6 +900,12 @@ async function runSearch(){
     const raw=err.message||"erreur inconnue";
     const cut=/failed to fetch|networkerror|load failed/i.test(raw);
     if(cut && document.visibilityState==="hidden"){ S.pendingRetry=true; return; }
+    const transient=/surcharg|erreur 50\d/i.test(raw);
+    if(transient && eng==="claude" && (S.settings.gkey||"").trim() && !force){
+      toast("Claude surchargé — je tente avec Gemini");
+      return runSearch("gemini");
+    }
+    S.lastFailedEngine=eng;
     S.lastError = cut ? "connexion interrompue — réseau coupé ou téléphone mis en veille pendant la recherche" : raw;
     S.lastEngine="error"; S.results=[];
     S.searchView="results"; S.view="results"; render();
@@ -919,8 +942,12 @@ function vResults(){
   if(S.lastEngine==="gemini"||S.lastEngine==="claude"){
     head=`<div class="demo" style="background:var(--mist-2);border-color:var(--line);color:var(--sage-deep)">✨<span><b>Propositions réelles</b> — générées par ${S.lastEngine==="claude"?"Claude":"Gemini"} avec recherche web, météo Open-Meteo, autour de ${esc(S.settings.pos?S.settings.pos.label:"votre position")}. Vérifie horaires et prix sur les liens avant de partir.</span></div>`;
   }else if(S.lastEngine==="error"){
-    head=`<div class="demo">⚠️<span><b>Le moteur n'a pas répondu</b> — ${esc(S.lastError)}. Vérifie ta clé et ta connexion, puis réessaie.</span></div>
-    <div class="linkrow" style="margin-bottom:14px"><button class="btn subtle sm" data-act="goRetry" style="flex:1">Réessayer</button><button class="btn subtle sm" data-act="settings" style="flex:1">Réglages</button></div>`;
+    const surch=/surcharg/i.test(S.lastError||"");
+    const suffix = surch ? "Cela vient des serveurs du moteur, pas de ta clé — patiente une minute." : "Vérifie ta clé et ta connexion, puis réessaie.";
+    const alt = (S.lastFailedEngine==="gemini" && (S.settings.ckey||"").trim())
+      ? `<button class="btn subtle sm" data-act="retryOther" style="flex:1">Tenter avec Claude</button>` : "";
+    head=`<div class="demo">⚠️<span><b>Le moteur n'a pas répondu</b> — ${esc(S.lastError)}. ${suffix}</span></div>
+    <div class="linkrow" style="margin-bottom:14px"><button class="btn subtle sm" data-act="goRetry" style="flex:1">Réessayer</button>${alt}<button class="btn subtle sm" data-act="settings" style="flex:1">Réglages</button></div>`;
   }else{
     head=`<div class="demo">🧪<span><b>Aperçu de démonstration</b> (lieux fictifs). Ajoute ta clé Gemini dans les Réglages pour de vraies propositions autour de toi.</span></div>`;
   }
@@ -1047,6 +1074,7 @@ document.addEventListener("click", e=>{
   else if(a==="sBudT"){ s.budgetOn=!s.budgetOn; render(); }
   else if(a==="goSearch") launchSearch("full");
   else if(a==="goRetry") runSearch();
+  else if(a==="retryOther") runSearch("claude");
   else if(a==="testKey") testKey(v);
   else if(a==="setEngine"){ S.settings.engine=v; persist(); render(); }
   else if(a==="geo") askGeo();
