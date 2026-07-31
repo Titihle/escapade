@@ -441,7 +441,7 @@ const S = {
   history:  saved.history  || [],
   newsOff:[], favTab:"favs", searchMode:"full", searchView:"form", lastMode:"full",
   settings: Object.assign({gkey:"",ckey:"",pos:null,engine:"gemini"}, saved.settings||{}),
-  lastEngine:null, lastError:"",
+  lastEngine:null, lastError:"", pendingRetry:false,
   editing:null, tmp:null,
   search:{ who:[], cats:[], subs:{}, when:"Aujourd'hui", date:"", moment:"Après-midi",
            duree:"Demi-journée", transports:[], maxTime:45, budgetOn:false, budget:100 },
@@ -613,7 +613,7 @@ function vSettings(){
   <p class="eyebrow">Données</p>
   <button class="btn danger" data-act="reset">${I.trash} Réinitialiser l'application</button>
   <div class="spacer"></div>
-  <p class="hint" style="text-align:center">Escapade v0.6 — moteurs Gemini & Claude · météo Open-Meteo</p>`;
+  <p class="hint" style="text-align:center">Escapade v0.6.1 — moteurs Gemini & Claude · météo Open-Meteo</p>`;
 }
 async function testKey(kind){
   const isC = kind==="c";
@@ -689,12 +689,12 @@ BUDGET TOTAL MAXIMUM : ${s.budgetOn? s.budget+" € pour tout le groupe" : "libr
 MÉTÉO PRÉVUE SUR PLACE CE JOUR-LÀ : ${meteo?meteo.desc:"non disponible"} — tiens-en compte (privilégie l'intérieur si mauvais temps).
 MISSION : à l'aide de la recherche web, trouve 10 sorties RÉELLES, existantes, ouvertes/disponibles à cette date, atteignables dans le temps de trajet. Classe-les de la plus à la moins pertinente pour CES participants précisément.
 RÉPONDS UNIQUEMENT avec ce JSON, sans aucun texte autour :
-{"propositions":[{"titre":"","types":["un ou plusieurs parmi : nature, resto, theatre, cinema, musee, concert, sport, loisirs, cafe, shopping"],"description":"1 à 2 phrases concrètes","pourquoi":"1 phrase personnalisée citant les prénoms","lieu":"nom exact du lieu","adresse":"adresse ou commune","temps_trajet":"ex. 25 min · voiture","prix":"ex. 12 € / pers. ou Gratuit","lien":"URL réelle trouvée par la recherche (site officiel, billetterie, fiche) sinon chaîne vide","score":95}]}
+{"propositions":[{"titre":"","types":["un ou plusieurs parmi : nature, resto, theatre, cinema, musee, concert, sport, loisirs, cafe, shopping"],"description":"1 phrase concrète","pourquoi":"1 phrase personnalisée citant les prénoms","lieu":"nom exact du lieu","adresse":"adresse ou commune","temps_trajet":"ex. 25 min · voiture","prix":"ex. 12 € / pers. ou Gratuit","lien":"URL réelle trouvée par la recherche (site officiel, billetterie, fiche) sinon chaîne vide","score":95}]}
 RÈGLES ABSOLUES : n'invente jamais un lieu ni un lien ; en cas de doute sur un lien, mets une chaîne vide. Le champ types n'utilise que les identifiants listés. Vérifie l'ouverture à la date demandée quand c'est possible.`;
 }
 async function geminiCall(promptText,useSearch){
   const key=(S.settings.gkey||"").trim();
-  const body={ contents:[{role:"user",parts:[{text:promptText}]}], generationConfig:{temperature:0.8} };
+  const body={ contents:[{role:"user",parts:[{text:promptText}]}], generationConfig:{temperature:0.8, thinkingConfig:{thinkingBudget:0}} };
   if(useSearch) body.tools=[{google_search:{}}];
   const r=await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key="+encodeURIComponent(key),
     { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) });
@@ -759,6 +759,17 @@ function normalizeProp(p,i,meteo){
     met: meteo? [meteo.ic,meteo.t] : ["🌤️",""],
     q:(p.lieu? p.lieu+", ":"")+String(p.adresse||(S.settings.pos?S.settings.pos.label:"")),
     score:+p.score||0 };
+}
+let WLOCK=null;
+async function keepAwake(on){
+  try{
+    if(on && "wakeLock" in navigator && !WLOCK){
+      WLOCK=await navigator.wakeLock.request("screen");
+      WLOCK.addEventListener("release",()=>{ WLOCK=null; });
+    }else if(!on && WLOCK){
+      const l=WLOCK; WLOCK=null; await l.release();
+    }
+  }catch(e){}
 }
 let LID=null;
 function showLoader(kind){
@@ -850,6 +861,7 @@ async function runSearch(){
   const eng=effectiveEngine();
   if(eng && !S.settings.pos){ toast("Indique d'abord ta position (Réglages)"); S.view="settings"; render(); return; }
   showLoader(eng?"ai":"demo", eng==="claude"?"Claude":"Gemini");
+  if(eng) keepAwake(true);
   try{
     if(!eng){
       await sleep(2100);
@@ -868,8 +880,14 @@ async function runSearch(){
     hideLoader(); S.searchView="results"; S.view="results"; render();
   }catch(err){
     hideLoader();
-    S.lastError=err.message||"erreur inconnue"; S.lastEngine="error"; S.results=[];
+    const raw=err.message||"erreur inconnue";
+    const cut=/failed to fetch|networkerror|load failed/i.test(raw);
+    if(cut && document.visibilityState==="hidden"){ S.pendingRetry=true; return; }
+    S.lastError = cut ? "connexion interrompue — réseau coupé ou téléphone mis en veille pendant la recherche" : raw;
+    S.lastEngine="error"; S.results=[];
     S.searchView="results"; S.view="results"; render();
+  }finally{
+    keepAwake(false);
   }
 }
 
@@ -1048,6 +1066,14 @@ document.addEventListener("input", e=>{
   else if(b==="sdate") S.search.date=e.target.value;
   else if(b==="time"){ S.search.maxTime=+e.target.value; const o=document.getElementById("o-time"); if(o)o.textContent=S.search.maxTime+" min"; }
   else if(b==="budget"){ S.search.budget=+e.target.value; const o=document.getElementById("o-budget"); if(o)o.textContent=S.search.budget+" €"; }
+});
+
+document.addEventListener("visibilitychange", ()=>{
+  if(document.visibilityState==="visible" && S.pendingRetry){
+    S.pendingRetry=false;
+    toast("Recherche interrompue par la mise en veille — je relance !");
+    runSearch();
+  }
 });
 
 /* ════════════════════ Démarrage ════════════════════ */
