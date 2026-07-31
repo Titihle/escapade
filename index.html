@@ -442,12 +442,13 @@ const S = {
   newsOff:[], favTab:"favs", searchMode:"full", searchView:"form", lastMode:"full",
   settings: Object.assign({gkey:"",ckey:"",pos:null,engine:"gemini"}, saved.settings||{}),
   lastEngine:null, lastError:"", pendingRetry:false, lastFailedEngine:null,
+  news: saved.news||null, newsError:"", newsFailedEngine:null,
   editing:null, tmp:null,
   search:{ who:[], cats:[], subs:{}, when:"Aujourd'hui", date:"", moment:"Après-midi",
            duree:"Demi-journée", transports:[], maxTime:45, budgetOn:false, budget:100 },
   results:null
 };
-function persist(){ store.set({ profiles:S.profiles, favs:S.favs, history:S.history, settings:S.settings }); }
+function persist(){ store.set({ profiles:S.profiles, favs:S.favs, history:S.history, settings:S.settings, news:S.news }); }
 
 /* ════════════════════ Petits utilitaires ════════════════════ */
 const esc = s => String(s==null?"":s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -613,7 +614,7 @@ function vSettings(){
   <p class="eyebrow">Données</p>
   <button class="btn danger" data-act="reset">${I.trash} Réinitialiser l'application</button>
   <div class="spacer"></div>
-  <p class="hint" style="text-align:center">Escapade v0.6.4 — moteurs Gemini & Claude · météo Open-Meteo</p>`;
+  <p class="hint" style="text-align:center">Escapade v0.7 — moteurs Gemini & Claude · météo & veille IA</p>`;
 }
 async function testKey(kind){
   const isC = kind==="c";
@@ -903,7 +904,7 @@ async function runSearch(force){
     hideLoader();
     const raw=err.message||"erreur inconnue";
     const cut=/failed to fetch|networkerror|load failed/i.test(raw);
-    if(cut && document.visibilityState==="hidden"){ S.pendingRetry=true; return; }
+    if(cut && document.visibilityState==="hidden"){ S.pendingRetry="search"; return; }
     const transient=/surcharg|erreur 50\d/i.test(raw);
     if(transient && eng==="claude" && (S.settings.gkey||"").trim() && !force){
       toast("Claude surchargé — je tente avec Gemini");
@@ -916,6 +917,75 @@ async function runSearch(force){
   }finally{
     keepAwake(false);
   }
+}
+
+/* ════════════════════ Veille réelle : prompt & exécution ════════════════════ */
+function checkedNames(){ return S.profiles.filter((_,i)=>!S.newsOff.includes(i)).map(p=>p.name); }
+function relTime(ts){
+  const m=Math.round((Date.now()-ts)/6e4);
+  if(m<2) return "à l'instant"; if(m<60) return "il y a "+m+" min";
+  const h=Math.round(m/60); if(h<24) return "il y a "+h+" h";
+  const d=Math.round(h/24); return "il y a "+d+" jour"+(d>1?"s":"");
+}
+function buildNewsPrompt(){
+  const pos=S.settings.pos;
+  const t0=targetDateToday();
+  const d=new Date(); d.setDate(d.getDate()+30); const off=d.getTimezoneOffset();
+  const t1=new Date(d.getTime()-off*6e4).toISOString().slice(0,10);
+  const chk=S.profiles.filter((_,i)=>!S.newsOff.includes(i));
+  const parts=chk.map(p=>`- ${p.name}, ${p.age||"âge non précisé"} ans. Aime : ${(p.tags||[]).concat(p.free?[p.free]:[]).join(", ")||"non précisé"}. À éviter : ${p.avoid||"rien"}.`);
+  const noms=chk.map(p=>p.name).join(", ")||"aucun";
+  return `Tu es le veilleur local d'une application familiale de sorties.
+POSITION : ${pos.label} (latitude ${pos.lat}, longitude ${pos.lon}).
+PÉRIODE : du ${t0} au ${t1} (les 30 prochains jours).
+PROFILS À INSPIRER :
+${parts.join("\n")||"- Aucun profil : sélection grand public et familiale."}
+MISSION : à l'aide de la recherche web, trouve 12 événements ou bons plans ÉPHÉMÈRES et RÉELS dans cette période (fêtes locales, expositions temporaires, spectacles, marchés spéciaux, festivals, portes ouvertes, animations, promotions locales notables), à moins de 45 minutes de la position. Répartis les dates sur toute la période et adapte la sélection aux goûts des profils.
+RÉPONDS UNIQUEMENT avec ce JSON, sans aucun texte autour :
+{"evenements":[{"titre":"","date":"YYYY-MM-DD","emoji":"un seul emoji adapté","description":"1 phrase concrète","lieu":"nom exact du lieu","adresse":"commune","distance":"ex. à 3 km","prix":"ex. Gratuit ou Dès 8 €","lien":"URL réelle trouvée par la recherche sinon chaîne vide","pour":["prénoms des profils concernés, parmi : ${noms}"]}]}
+RÈGLES ABSOLUES : uniquement des événements réels et vérifiables ; dates comprises dans la période ; n'invente jamais un lieu ni un lien (sinon chaîne vide) ; privilégie la justesse à la vitesse.`;
+}
+async function engineJSON(promptText,eng){
+  const txt = eng==="claude" ? await claudeCall(promptText,true) : await geminiCall(promptText,true);
+  return extractJSON(txt);
+}
+function normalizeEvent(p,i){
+  let lien=String(p.lien||"").trim(); if(!/^https?:\/\//i.test(lien)) lien="";
+  return { id:"aiev-"+Date.now()+"-"+i, kind:"event",
+    em:(String(p.emoji||"🎪").trim().slice(0,4))||"🎪", t:String(p.titre||"Événement"),
+    sub:String(p.description||""), lieu:String(p.lieu||""), dist:String(p.distance||""),
+    prix:String(p.prix||""), lien, date:String(p.date||""),
+    q:(p.lieu? p.lieu+", ":"")+String(p.adresse||(S.settings.pos?S.settings.pos.label:"")),
+    pour:(p.pour||[]).map(x=>String(x)) };
+}
+async function runNews(force){
+  const eng = force || effectiveEngine();
+  if(!eng){ toast("Ajoute une clé IA dans les Réglages"); return; }
+  if(!S.settings.pos){ toast("Indique d'abord ta position (Réglages)"); S.view="settings"; render(); return; }
+  showLoader("ai", eng==="claude"?"Claude":"Gemini");
+  const M=document.getElementById("loadmsg"); if(M) M.textContent="Balayage des 30 prochains jours…";
+  keepAwake(true);
+  try{
+    const js=await withRetry(()=>engineJSON(buildNewsPrompt(),eng));
+    const items=(js.evenements||js.events||[]).slice(0,15).map((p,i)=>normalizeEvent(p,i));
+    if(!items.length) throw new Error("aucun événement reçu");
+    S.news={ items, ts:Date.now(), eng, who:checkedNames().join(",") };
+    S.newsError=""; S.newsFailedEngine=null; persist();
+    hideLoader(); S.tab="news"; S.view=null; render();
+  }catch(err){
+    hideLoader();
+    const raw=err.message||"erreur inconnue";
+    const cut=/failed to fetch|networkerror|load failed/i.test(raw);
+    if(cut && document.visibilityState==="hidden"){ S.pendingRetry="news"; return; }
+    const transient=/surcharg|erreur 50\d/i.test(raw);
+    if(transient && eng==="claude" && (S.settings.gkey||"").trim() && !force){
+      toast("Claude surchargé — je tente avec Gemini");
+      return runNews("gemini");
+    }
+    S.newsFailedEngine=eng;
+    S.newsError = cut ? "connexion interrompue — réseau ou mise en veille" : raw;
+    S.tab="news"; S.view=null; render();
+  }finally{ keepAwake(false); }
 }
 
 /* ════════════════════ Écran Résultats ════════════════════ */
@@ -987,28 +1057,61 @@ function eventsRanked(){
 function evCard(e,frozen){
   let day,mon;
   if(frozen){ day=e.day; mon=e.mon; }
+  else if(e.date){ const d=new Date(e.date+"T12:00"); day=isNaN(d)?"?":d.getDate(); mon=isNaN(d)?"":d.toLocaleDateString("fr-FR",{month:"short"}).replace(".",""); }
   else{ const d=new Date(); d.setDate(d.getDate()+e.off); day=d.getDate(); mon=d.toLocaleDateString("fr-FR",{month:"short"}).replace(".",""); }
   const fav=S.favs.some(f=>f.id===e.id);
-  const forWho = e.forName ? `<span class="tag">✨ Pensé pour ${esc(e.forName)}</span>` : "";
+  const names = e.badge!==undefined ? e.badge : (e.forName||"");
+  const forWho = names ? `<span class="tag">✨ Pour ${esc(names)}</span>` : "";
+  const maps=`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(e.q||e.lieu||e.t)}`;
+  const links = e.lien
+    ? `<span style="display:inline-flex;gap:16px;flex-wrap:wrap"><a class="evlink" target="_blank" rel="noopener" href="${esc(e.lien)}">${I.ext} Voir l'événement</a><a class="evlink" target="_blank" rel="noopener" href="${maps}">${I.pin} Maps</a></span>`
+    : `<a class="evlink" target="_blank" rel="noopener" href="${maps}">${I.pin} Voir sur Google Maps</a>`;
   return `<article class="card ev">
     <span class="evdate"><b>${day}</b><span>${mon}</span></span>
     <span style="flex:1"><h3 class="serif">${e.em} ${esc(e.t)}</h3><p class="sub">${esc(e.sub)}</p>
-      <div class="tagrow"><span class="tag">📍 ${esc(e.lieu)} · ${esc(e.dist)}</span><span class="tag">${esc(e.prix)}</span>${forWho}</div>
-      <a class="evlink" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(e.lieu||e.t)}">${I.pin} Voir sur Google Maps</a></span>
+      <div class="tagrow"><span class="tag">📍 ${esc(e.lieu)}${e.dist?" · "+esc(e.dist):""}</span>${e.prix?`<span class="tag">${esc(e.prix)}</span>`:""}${forWho}</div>
+      ${links}</span>
     <button class="favbtn ${fav?"on":""}" data-act="fav" data-v="${e.id}" aria-label="${fav?"Retirer des favoris":"Ajouter aux favoris"}">${fav?I.heartF:I.heartO}</button>
   </article>`;
 }
 function vNews(){
+  const eng=effectiveEngine();
   const filt = S.profiles.length
     ? `<div class="chips" style="margin-bottom:6px">${S.profiles.map((p,i)=>`<button class="chip ${S.newsOff.includes(i)?"":"on"}" data-act="nProf" data-v="${i}">${av(p,"")}${esc(p.name)}</button>`).join("")}</div>
-       <p class="hint" style="margin-bottom:14px">La sélection se réorganise selon les profils cochés — décoche pour élargir.</p>`
+       <p class="hint" style="margin-bottom:14px">La veille s'inspire des profils cochés.</p>`
     : `<p class="hint" style="margin-bottom:14px">Ajoute des profils pour une veille inspirée des goûts de ta tribu.</p>`;
-  const evs = eventsRanked().map(e=>evCard(e,false)).join("");
+  let body="";
+  if(!eng){
+    body=`<div class="demo">🧪<span><b>Veille de démonstration.</b> Ajoute une clé IA dans les Réglages pour la vraie veille géolocalisée.</span></div>
+    ${eventsRanked().map(e=>evCard(e,false)).join("")}`;
+  }else if(!S.settings.pos){
+    body=`<div class="card empty"><div class="em">📍</div><h3 class="serif">Une position, et je scrute</h3>
+      <p>Indique ta position dans les Réglages pour balayer les 30 prochains jours autour de toi.</p>
+      <button class="btn sm" data-act="settings" style="margin:0 auto">Ouvrir les Réglages</button></div>`;
+  }else if(S.newsError){
+    const surch=/surcharg/i.test(S.newsError);
+    const alt=(S.newsFailedEngine==="gemini"&&(S.settings.ckey||"").trim())
+      ? `<button class="btn subtle sm" data-act="newsClaude" style="flex:1">Tenter avec Claude</button>` : "";
+    body=`<div class="demo">⚠️<span><b>La veille n'a pas abouti</b> — ${esc(S.newsError)}. ${surch?"Cela vient des serveurs du moteur, pas de ta clé.":"Vérifie ta clé et ta connexion."}</span></div>
+    <div class="linkrow"><button class="btn subtle sm" data-act="newsRun" style="flex:1">Réessayer</button>${alt}<button class="btn subtle sm" data-act="settings" style="flex:1">Réglages</button></div>`;
+  }else if(!S.news){
+    body=`<div class="card empty"><div class="em">🔭</div><h3 class="serif">Que se passe-t-il autour de vous&nbsp;?</h3>
+      <p>Escapade balaie les 30 prochains jours — événements éphémères, expos, fêtes, bons plans — et retient ce qui colle aux profils cochés.</p>
+      <button class="btn sm" data-act="newsRun" style="margin:0 auto">🔭 Lancer la veille</button></div>`;
+  }else{
+    const chk=checkedNames();
+    const items=[...S.news.items].map(e=>{
+      const match=(e.pour||[]).filter(n=>chk.includes(n));
+      e.badge=match.join(", "); e._m=match.length; return e;
+    }).sort((a,b)=> b._m-a._m || String(a.date).localeCompare(String(b.date)));
+    const stale = S.news.who!==chk.join(",");
+    body=`<div class="demo" style="background:var(--mist-2);border-color:var(--line);color:var(--sage-deep)">✨<span><b>Veille réelle</b> — ${S.news.eng==="claude"?"Claude":"Gemini"} · autour de ${esc(S.settings.pos.label)} · actualisée ${relTime(S.news.ts)}.${stale?" Profils modifiés — actualise pour recomposer.":""} Vérifie dates et horaires sur les liens.</span></div>
+    <button class="btn subtle sm" data-act="newsRun" style="margin:0 0 14px">↻ Actualiser la veille</button>
+    ${items.map(e=>evCard(e,false)).join("")}`;
+  }
   return `
   <p class="eyebrow">Autour de vous <small>30 prochains jours</small></p>
-  ${filt}
-  <div class="demo">🧪<span><b>Veille de démonstration.</b> Événements d'exemple (les liens ouvrent Google Maps) — la vraie veille géolocalisée arrive avec le moteur IA.</span></div>
-  ${evs}`;
+  ${filt}${body}`;
 }
 
 /* ════════════════════ Écran Favoris & Historique ════════════════════ */
@@ -1035,6 +1138,15 @@ function toggleFav(id){
   const k=S.favs.findIndex(f=>f.id===id);
   if(k>=0){ S.favs.splice(k,1); toast("Retiré des favoris"); persist(); render(); return; }
   let r=(S.results||[]).find(x=>x.id===id);
+  if(!r && String(id).indexOf("aiev-")===0){
+    const e=((S.news&&S.news.items)||[]).find(x=>x.id===id);
+    if(e){
+      const d=new Date((e.date||"")+"T12:00");
+      r={ ...e, day:isNaN(d)?"?":d.getDate(),
+          mon:isNaN(d)?"":d.toLocaleDateString("fr-FR",{month:"short"}).replace(".",""),
+          forName:(e.badge||"") };
+    }
+  }
   if(!r && String(id).indexOf("ev-")===0){
     const e=eventsList().find(x=>x.id===id);
     if(e){
@@ -1079,6 +1191,8 @@ document.addEventListener("click", e=>{
   else if(a==="goSearch") launchSearch("full");
   else if(a==="goRetry") runSearch();
   else if(a==="retryOther") runSearch("claude");
+  else if(a==="newsRun") runNews();
+  else if(a==="newsClaude") runNews("claude");
   else if(a==="testKey") testKey(v);
   else if(a==="setEngine"){ S.settings.engine=v; persist(); render(); }
   else if(a==="geo") askGeo();
@@ -1102,9 +1216,9 @@ document.addEventListener("input", e=>{
 
 document.addEventListener("visibilitychange", ()=>{
   if(document.visibilityState==="visible" && S.pendingRetry){
-    S.pendingRetry=false;
-    toast("Recherche interrompue par la mise en veille — je relance !");
-    runSearch();
+    const k=S.pendingRetry; S.pendingRetry=false;
+    toast("Interrompu par la mise en veille — je relance !");
+    if(k==="news") runNews(); else runSearch();
   }
 });
 
