@@ -613,7 +613,7 @@ function vSettings(){
   <p class="eyebrow">Données</p>
   <button class="btn danger" data-act="reset">${I.trash} Réinitialiser l'application</button>
   <div class="spacer"></div>
-  <p class="hint" style="text-align:center">Escapade v0.6.1 — moteurs Gemini & Claude · météo Open-Meteo</p>`;
+  <p class="hint" style="text-align:center">Escapade v0.6.2 — moteurs Gemini & Claude · météo Open-Meteo</p>`;
 }
 async function testKey(kind){
   const isC = kind==="c";
@@ -689,12 +689,12 @@ BUDGET TOTAL MAXIMUM : ${s.budgetOn? s.budget+" € pour tout le groupe" : "libr
 MÉTÉO PRÉVUE SUR PLACE CE JOUR-LÀ : ${meteo?meteo.desc:"non disponible"} — tiens-en compte (privilégie l'intérieur si mauvais temps).
 MISSION : à l'aide de la recherche web, trouve 10 sorties RÉELLES, existantes, ouvertes/disponibles à cette date, atteignables dans le temps de trajet. Classe-les de la plus à la moins pertinente pour CES participants précisément.
 RÉPONDS UNIQUEMENT avec ce JSON, sans aucun texte autour :
-{"propositions":[{"titre":"","types":["un ou plusieurs parmi : nature, resto, theatre, cinema, musee, concert, sport, loisirs, cafe, shopping"],"description":"1 phrase concrète","pourquoi":"1 phrase personnalisée citant les prénoms","lieu":"nom exact du lieu","adresse":"adresse ou commune","temps_trajet":"ex. 25 min · voiture","prix":"ex. 12 € / pers. ou Gratuit","lien":"URL réelle trouvée par la recherche (site officiel, billetterie, fiche) sinon chaîne vide","score":95}]}
-RÈGLES ABSOLUES : n'invente jamais un lieu ni un lien ; en cas de doute sur un lien, mets une chaîne vide. Le champ types n'utilise que les identifiants listés. Vérifie l'ouverture à la date demandée quand c'est possible.`;
+{"propositions":[{"titre":"","types":["un ou plusieurs parmi : nature, resto, theatre, cinema, musee, concert, sport, loisirs, cafe, shopping"],"description":"1 à 2 phrases concrètes","pourquoi":"1 phrase personnalisée citant les prénoms","lieu":"nom exact du lieu","adresse":"adresse ou commune","temps_trajet":"ex. 25 min · voiture","prix":"ex. 12 € / pers. ou Gratuit","lien":"URL réelle trouvée par la recherche (site officiel, billetterie, fiche) sinon chaîne vide","score":95}]}
+RÈGLES ABSOLUES : n'invente jamais un lieu ni un lien ; en cas de doute sur un lien, mets une chaîne vide. Le champ types n'utilise que les identifiants listés. Privilégie la justesse à la vitesse : vérifie l'existence réelle des lieux, leur ouverture à la date demandée et la validité des liens.`;
 }
 async function geminiCall(promptText,useSearch){
   const key=(S.settings.gkey||"").trim();
-  const body={ contents:[{role:"user",parts:[{text:promptText}]}], generationConfig:{temperature:0.8, thinkingConfig:{thinkingBudget:0}} };
+  const body={ contents:[{role:"user",parts:[{text:promptText}]}], generationConfig:{temperature:0.8} };
   if(useSearch) body.tools=[{google_search:{}}];
   const r=await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key="+encodeURIComponent(key),
     { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) });
@@ -777,7 +777,7 @@ function showLoader(kind){
   const msgs = kind==="ai"
     ? ["Interrogation de "+(arguments[1]||"l'IA")+"…","Recherche des lieux ouverts…","Lecture de la météo…","Classement pour la tribu…"]
     : ["On cherche le bon cap…","Lecture du ciel du jour…","Repérage des pépites autour de vous…"];
-  Su.textContent = kind==="ai" ? "Vraies recherches en cours — jusqu'à ~30 s" : "Escapade prépare vos propositions";
+  Su.textContent = kind==="ai" ? "Recherches approfondies en cours — parfois jusqu'à une minute" : "Escapade prépare vos propositions";
   let k=0; M.textContent=msgs[0]; L.classList.add("on");
   clearInterval(LID); LID=setInterval(()=>{ k=(k+1)%msgs.length; M.textContent=msgs[k]; },1300);
 }
