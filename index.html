@@ -194,6 +194,9 @@ input[type=date]{border:1.5px solid var(--line);border-radius:12px;padding:9px 1
 .linkbtn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:11px;border-radius:13px;text-decoration:none;
   border:1.5px solid var(--sage);color:var(--sage-deep);font-weight:700;font-size:14px}
 .linkbtn svg{width:15px;height:15px}
+.linkrow{display:flex;gap:8px}
+.linkrow .linkbtn{flex:1}
+.linkbtn.alt{border-color:var(--line);color:var(--soft)}
 
 /* ───────────────────────────── Quoi de neuf ───────────────────────────── */
 .ev{display:flex;gap:13px;padding:14px;margin-bottom:11px;align-items:flex-start}
@@ -437,12 +440,14 @@ const S = {
   favs:     saved.favs     || [],
   history:  saved.history  || [],
   newsOff:[], favTab:"favs", searchMode:"full", searchView:"form", lastMode:"full",
+  settings: Object.assign({gkey:"",ckey:"",pos:null,engine:"gemini"}, saved.settings||{}),
+  lastEngine:null, lastError:"",
   editing:null, tmp:null,
   search:{ who:[], cats:[], subs:{}, when:"Aujourd'hui", date:"", moment:"Après-midi",
            duree:"Demi-journée", transports:[], maxTime:45, budgetOn:false, budget:100 },
   results:null
 };
-function persist(){ store.set({ profiles:S.profiles, favs:S.favs, history:S.history }); }
+function persist(){ store.set({ profiles:S.profiles, favs:S.favs, history:S.history, settings:S.settings }); }
 
 /* ════════════════════ Petits utilitaires ════════════════════ */
 const esc = s => String(s==null?"":s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -572,20 +577,200 @@ function saveProfile(){
 
 /* ════════════════════ Écran Réglages ════════════════════ */
 function vSettings(){
-  const row=(em,t,d,soon)=>`<div class="setrow"><span style="font-size:20px">${em}</span>
-    <span><span class="t">${t}</span><br><span class="d">${d}</span></span>${soon?'<span class="soon">Bientôt</span>':""}</div>`;
+  const st=S.settings;
   return `
   <div class="backrow"><button class="iconbtn" data-act="backHome" aria-label="Retour">${I.back}</button><h2 class="serif">Réglages</h2></div>
-  <div class="card">
-    ${row("🤖","Moteur IA","Tes deux moteurs, Claude et Gemini — branchement à l'étape suivante",true)}
-    ${row("📍","Ma position","Géolocalisation pour les distances et la veille",true)}
-    ${row("🌦️","Météo","Prévisions Open-Meteo intégrées aux propositions",true)}
+
+  <p class="eyebrow">Moteur IA</p>
+  <div class="card" style="padding:15px 16px">
+    <div class="seg" style="margin-bottom:14px">
+      <button class="${st.engine!=="claude"?"on":""}" data-act="setEngine" data-v="gemini">Gemini</button>
+      <button class="${st.engine==="claude"?"on":""}" data-act="setEngine" data-v="claude">Claude</button>
+    </div>
+    <div class="field" style="margin-bottom:10px"><label for="st-g">Clé API Gemini <span style="text-transform:none;color:var(--soft);font-weight:500">· palier gratuit</span></label>
+      <input type="password" id="st-g" data-bind="gkey" value="${esc(st.gkey||"")}" placeholder="AIza…" autocomplete="off"></div>
+    <button class="btn subtle sm" data-act="testKey" data-v="g">Tester la clé Gemini</button>
+    <div style="height:14px"></div>
+    <div class="field" style="margin-bottom:10px"><label for="st-c">Clé API Claude <span style="text-transform:none;color:var(--soft);font-weight:500">· facturée à l'usage</span></label>
+      <input type="password" id="st-c" data-bind="ckey" value="${esc(st.ckey||"")}" placeholder="sk-ant-…" autocomplete="off"></div>
+    <button class="btn subtle sm" data-act="testKey" data-v="c">Tester la clé Claude</button>
+    <p class="hint" style="margin-top:12px">Le moteur sélectionné mène la recherche ; si sa clé manque, Escapade bascule automatiquement sur l'autre. Les clés restent uniquement sur cet appareil. Sans aucune clé : mode démo.</p>
   </div>
+
+  <p class="eyebrow">Ma position</p>
+  <div class="card" style="padding:15px 16px">
+    <p style="font-weight:600;font-size:14.5px">${st.pos? "📍 "+esc(st.pos.label) : "Aucune position enregistrée"}</p>
+    <div class="spacer"></div>
+    <button class="btn subtle sm" data-act="geo">Utiliser ma position actuelle</button>
+    <div class="spacer"></div>
+    <div class="field" style="margin-bottom:0"><label for="st-city">Ou entre une ville</label>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="st-city" placeholder="Ex. Vincennes" style="flex:1;background:#fff;border:1.5px solid var(--line);border-radius:13px;padding:12px 14px">
+        <button class="btn sm" data-act="citySearch">OK</button>
+      </div></div>
+  </div>
+
   <p class="eyebrow">Données</p>
   <button class="btn danger" data-act="reset">${I.trash} Réinitialiser l'application</button>
   <div class="spacer"></div>
-  <p class="hint" style="text-align:center">Escapade v0.4 — version de démonstration (coquille)</p>`;
+  <p class="hint" style="text-align:center">Escapade v0.6 — moteurs Gemini & Claude · météo Open-Meteo</p>`;
 }
+async function testKey(kind){
+  const isC = kind==="c";
+  const key=((isC?S.settings.ckey:S.settings.gkey)||"").trim();
+  if(!key){ toast(isC?"Colle d'abord ta clé Claude":"Colle d'abord ta clé Gemini"); return; }
+  toast("Test de la clé en cours…");
+  try{
+    if(isC) await claudeCall("Réponds uniquement : OK", false);
+    else await geminiCall("Réponds uniquement : OK", false);
+    toast(isC?"Clé Claude valide ✅":"Clé Gemini valide ✅");
+  }catch(e){ toast("Échec : "+e.message); }
+}
+function askGeo(){
+  if(!("geolocation" in navigator)){ toast("Géolocalisation indisponible — entre une ville"); return; }
+  toast("Localisation en cours…");
+  navigator.geolocation.getCurrentPosition(async pos=>{
+    const lat=+pos.coords.latitude.toFixed(4), lon=+pos.coords.longitude.toFixed(4);
+    let label="Ma position";
+    try{
+      const r=await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=fr`);
+      const j=await r.json(); label=j.city||j.locality||label;
+    }catch(e){}
+    S.settings.pos={lat,lon,label}; persist(); render(); toast("Position : "+label);
+  }, ()=>toast("Géolocalisation refusée — entre une ville"), {timeout:9000});
+}
+async function cityLookup(name){
+  try{
+    const r=await fetch("https://geocoding-api.open-meteo.com/v1/search?count=1&language=fr&name="+encodeURIComponent(name));
+    const j=await r.json(); const g=j.results&&j.results[0];
+    if(!g){ toast("Ville introuvable — vérifie l'orthographe"); return; }
+    S.settings.pos={lat:g.latitude,lon:g.longitude,label:g.name+(g.admin1?", "+g.admin1:"")};
+    persist(); render(); toast("Position enregistrée : "+g.name);
+  }catch(e){ toast("Recherche impossible — réseau ?"); }
+}
+
+/* ════════════════════ Moteur réel : météo, prompt, Gemini ════════════════════ */
+const sleep = ms => new Promise(r=>setTimeout(r,ms));
+function wIcon(c){ if(c===0)return"☀️"; if(c<=2)return"🌤️"; if(c===3)return"☁️"; if(c<=48)return"🌫️"; if(c<=67)return"🌧️"; if(c<=77)return"❄️"; if(c<=82)return"🌧️"; if(c<=86)return"❄️"; return"⛈️"; }
+function wDesc(c){ if(c===0)return"grand soleil"; if(c<=2)return"plutôt ensoleillé"; if(c===3)return"couvert"; if(c<=48)return"brumeux"; if(c<=67)return"pluvieux"; if(c<=77)return"neigeux"; if(c<=82)return"averses"; if(c<=86)return"neigeux"; return"orageux"; }
+function targetDate(){
+  const s=S.search; const d=new Date();
+  if(s.when==="Demain") d.setDate(d.getDate()+1);
+  else if(s.when==="Ce week-end"){ const dow=d.getDay(); if(dow!==0&&dow!==6) d.setDate(d.getDate()+(6-dow)); }
+  else if(s.when==="Choisir une date" && s.date) return s.date;
+  const off=d.getTimezoneOffset(); return new Date(d.getTime()-off*6e4).toISOString().slice(0,10);
+}
+async function fetchWeather(dateStr){
+  const pos=S.settings.pos; if(!pos) return null;
+  const today=targetDateToday(); const diff=(new Date(dateStr)-new Date(today))/864e5;
+  if(diff<0||diff>15) return null;
+  const u=`https://api.open-meteo.com/v1/forecast?latitude=${pos.lat}&longitude=${pos.lon}&daily=weather_code,temperature_2m_max,precipitation_probability_max&timezone=auto&start_date=${dateStr}&end_date=${dateStr}`;
+  const r=await fetch(u); if(!r.ok) return null;
+  const j=await r.json(); if(!j.daily||!j.daily.weather_code) return null;
+  const c=j.daily.weather_code[0], t=Math.round(j.daily.temperature_2m_max[0]), pp=j.daily.precipitation_probability_max[0];
+  return { ic:wIcon(c), t:t+"°", desc:wDesc(c)+", max "+t+"°C"+(pp!=null?", "+pp+"% de risque de pluie":"") };
+}
+function targetDateToday(){ const d=new Date(); const off=d.getTimezoneOffset(); return new Date(d.getTime()-off*6e4).toISOString().slice(0,10); }
+function buildPrompt(dateStr,meteo){
+  const s=S.search, pos=S.settings.pos;
+  const parts=s.who.map(i=>S.profiles[i]).filter(Boolean).map(p=>`- ${p.name}, ${p.age||"âge non précisé"} ans. Aime : ${(p.tags||[]).concat(p.free?[p.free]:[]).join(", ")||"non précisé"}. À éviter : ${p.avoid||"rien de précisé"}.`);
+  const subs=Object.entries(s.subs||{}).map(([cid,g])=>Object.values(g).map(v=>catLabel(cid)+" → "+v.join(", ")).join(" ; ")).filter(Boolean);
+  const trans=s.transports.length? s.transports.map(t=>TLONG[t]).join(" ou ") : "voiture ou transports en commun (retenir le plus rapide des deux)";
+  return `Tu es le concierge local d'une application familiale d'idées de sorties.
+POSITION DE DÉPART : ${pos.label} (latitude ${pos.lat}, longitude ${pos.lon}).
+DATE DE LA SORTIE : ${dateStr}, moment : ${s.moment}. Durée souhaitée : ${s.duree}.
+PARTICIPANTS :
+${parts.join("\n")||"- Non précisé (sortie générale tout public)"}
+${S.lastMode==="quick"
+  ? "MODE RAPIDE : aucun type imposé — choisis librement les types de sorties les plus adaptés à ces participants."
+  : "TYPES DE SORTIE SOUHAITÉS (combinables entre eux) : "+s.cats.map(catLabel).join(" + ")+".\nPRÉCISIONS : "+(subs.join(" | ")||"aucune")+"."}
+TRANSPORT : ${trans}. TEMPS DE TRAJET MAXIMUM : ${s.maxTime} minutes depuis la position de départ.
+BUDGET TOTAL MAXIMUM : ${s.budgetOn? s.budget+" € pour tout le groupe" : "libre"}.
+MÉTÉO PRÉVUE SUR PLACE CE JOUR-LÀ : ${meteo?meteo.desc:"non disponible"} — tiens-en compte (privilégie l'intérieur si mauvais temps).
+MISSION : à l'aide de la recherche web, trouve 10 sorties RÉELLES, existantes, ouvertes/disponibles à cette date, atteignables dans le temps de trajet. Classe-les de la plus à la moins pertinente pour CES participants précisément.
+RÉPONDS UNIQUEMENT avec ce JSON, sans aucun texte autour :
+{"propositions":[{"titre":"","types":["un ou plusieurs parmi : nature, resto, theatre, cinema, musee, concert, sport, loisirs, cafe, shopping"],"description":"1 à 2 phrases concrètes","pourquoi":"1 phrase personnalisée citant les prénoms","lieu":"nom exact du lieu","adresse":"adresse ou commune","temps_trajet":"ex. 25 min · voiture","prix":"ex. 12 € / pers. ou Gratuit","lien":"URL réelle trouvée par la recherche (site officiel, billetterie, fiche) sinon chaîne vide","score":95}]}
+RÈGLES ABSOLUES : n'invente jamais un lieu ni un lien ; en cas de doute sur un lien, mets une chaîne vide. Le champ types n'utilise que les identifiants listés. Vérifie l'ouverture à la date demandée quand c'est possible.`;
+}
+async function geminiCall(promptText,useSearch){
+  const key=(S.settings.gkey||"").trim();
+  const body={ contents:[{role:"user",parts:[{text:promptText}]}], generationConfig:{temperature:0.8} };
+  if(useSearch) body.tools=[{google_search:{}}];
+  const r=await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key="+encodeURIComponent(key),
+    { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) });
+  if(!r.ok){
+    let msg="erreur "+r.status;
+    if(r.status===400||r.status===403) msg="clé invalide ou non autorisée";
+    if(r.status===429) msg="quota gratuit du jour atteint";
+    throw new Error(msg);
+  }
+  const data=await r.json();
+  const cand=(data.candidates&&data.candidates[0])||{};
+  return ((cand.content&&cand.content.parts)||[]).map(x=>x.text||"").join("");
+}
+function extractJSON(txt){
+  const m=txt.match(/\{[\s\S]*\}/); if(!m) throw new Error("réponse illisible du moteur");
+  try{ return JSON.parse(m[0]); }catch(e){ throw new Error("réponse illisible du moteur"); }
+}
+async function geminiSearch(promptText){
+  return extractJSON(await geminiCall(promptText,true)).propositions||[];
+}
+async function claudeCall(promptText,useSearch){
+  const key=(S.settings.ckey||"").trim();
+  const body={ model:"claude-sonnet-4-6", max_tokens:4000, messages:[{role:"user",content:promptText}] };
+  if(useSearch) body.tools=[{type:"web_search_20250305",name:"web_search",max_uses:8}];
+  const r=await fetch("https://api.anthropic.com/v1/messages",{
+    method:"POST",
+    headers:{ "content-type":"application/json", "x-api-key":key,
+      "anthropic-version":"2023-06-01", "anthropic-dangerous-direct-browser-access":"true" },
+    body:JSON.stringify(body) });
+  if(!r.ok){
+    let msg="erreur "+r.status;
+    if(r.status===401) msg="clé Claude invalide";
+    if(r.status===400) msg="requête refusée — crédits API épuisés ou clé incorrecte ?";
+    if(r.status===429) msg="limite de débit atteinte — réessaie dans une minute";
+    if(r.status===529||r.status===503) msg="API Claude momentanément surchargée — réessaie";
+    try{ const j=await r.json(); if(j.error&&j.error.message) msg+=" · "+String(j.error.message).slice(0,90); }catch(e){}
+    throw new Error(msg);
+  }
+  const data=await r.json();
+  return (data.content||[]).filter(b=>b.type==="text").map(b=>b.text||"").join("");
+}
+async function claudeSearch(promptText){
+  return extractJSON(await claudeCall(promptText,true)).propositions||[];
+}
+function effectiveEngine(){
+  const g=(S.settings.gkey||"").trim(), c=(S.settings.ckey||"").trim();
+  const pref=S.settings.engine==="claude"?"claude":"gemini";
+  if(pref==="claude"&&c) return "claude";
+  if(pref==="gemini"&&g) return "gemini";
+  if(c) return "claude";
+  if(g) return "gemini";
+  return null;
+}
+function normalizeProp(p,i,meteo){
+  const ids=CATS.map(c=>c.id);
+  const types=(p.types||[]).map(x=>String(x).toLowerCase().trim());
+  let lien=String(p.lien||"").trim(); if(!/^https?:\/\//i.test(lien)) lien="";
+  return { id:"ai-"+Date.now()+"-"+i, kind:"sortie",
+    t:String(p.titre||"Sortie"), cats:types.filter(t=>ids.includes(t)), extra:types.filter(t=>!ids.includes(t)),
+    desc:String(p.description||""), why:String(p.pourquoi||""), lieu:String(p.lieu||""),
+    acces:String(p.temps_trajet||""), prix:String(p.prix||""), lien,
+    met: meteo? [meteo.ic,meteo.t] : ["🌤️",""],
+    q:(p.lieu? p.lieu+", ":"")+String(p.adresse||(S.settings.pos?S.settings.pos.label:"")),
+    score:+p.score||0 };
+}
+let LID=null;
+function showLoader(kind){
+  const L=document.getElementById("loader"),M=document.getElementById("loadmsg"),Su=document.getElementById("loadsub");
+  const msgs = kind==="ai"
+    ? ["Interrogation de "+(arguments[1]||"l'IA")+"…","Recherche des lieux ouverts…","Lecture de la météo…","Classement pour la tribu…"]
+    : ["On cherche le bon cap…","Lecture du ciel du jour…","Repérage des pépites autour de vous…"];
+  Su.textContent = kind==="ai" ? "Vraies recherches en cours — jusqu'à ~30 s" : "Escapade prépare vos propositions";
+  let k=0; M.textContent=msgs[0]; L.classList.add("on");
+  clearInterval(LID); LID=setInterval(()=>{ k=(k+1)%msgs.length; M.textContent=msgs[k]; },1300);
+}
+function hideLoader(){ clearInterval(LID); document.getElementById("loader").classList.remove("on"); }
 
 /* ════════════════════ Écran Recherche ════════════════════ */
 function vSearch(){
@@ -659,17 +844,33 @@ function launchSearch(mode){
   if(mode!=="quick" && !s.cats.length){ toast("Choisis au moins un type de sortie"); return; }
   if(mode==="quick") s.who=S.profiles.map((_,i)=>i);
   S.lastMode=mode||"full";
-  const L=document.getElementById("loader"), M=document.getElementById("loadmsg");
-  const msgs=["On cherche le bon cap…","Lecture du ciel du jour…","Repérage des pépites autour de vous…"];
-  let k=0; M.textContent=msgs[0]; L.classList.add("on");
-  const iv=setInterval(()=>{ k=(k+1)%msgs.length; M.textContent=msgs[k]; },850);
-  setTimeout(()=>{
-    clearInterval(iv); L.classList.remove("on");
-    S.results=mockResults();
+  runSearch();
+}
+async function runSearch(){
+  const eng=effectiveEngine();
+  if(eng && !S.settings.pos){ toast("Indique d'abord ta position (Réglages)"); S.view="settings"; render(); return; }
+  showLoader(eng?"ai":"demo", eng==="claude"?"Claude":"Gemini");
+  try{
+    if(!eng){
+      await sleep(2100);
+      S.results=mockResults(); S.lastEngine="demo";
+    }else{
+      const dateStr=targetDate();
+      const meteo=await fetchWeather(dateStr).catch(()=>null);
+      const prompt=buildPrompt(dateStr,meteo);
+      const raw = eng==="claude" ? await claudeSearch(prompt) : await geminiSearch(prompt);
+      const props=raw.slice(0,12).map((p,i)=>normalizeProp(p,i,meteo));
+      if(!props.length) throw new Error("aucune proposition reçue");
+      S.results=props; S.lastEngine=eng;
+    }
     S.history.unshift({ ts:Date.now(), who:nameList(), sum:searchSummary() });
     S.history=S.history.slice(0,20); persist();
+    hideLoader(); S.searchView="results"; S.view="results"; render();
+  }catch(err){
+    hideLoader();
+    S.lastError=err.message||"erreur inconnue"; S.lastEngine="error"; S.results=[];
     S.searchView="results"; S.view="results"; render();
-  },2100);
+  }
 }
 
 /* ════════════════════ Écran Résultats ════════════════════ */
@@ -684,27 +885,39 @@ function resCard(r,idx){
       <h3 class="serif">${esc(r.t)}</h3>
       <button class="favbtn ${fav?"on":""}" data-act="fav" data-v="${r.id}" aria-label="${fav?"Retirer des favoris":"Ajouter aux favoris"}">${fav?I.heartF:I.heartO}</button>
     </div>
-    <div class="tagrow">${r.cats.map(c=>`<span class="tag">${catLabel(c)}</span>`).join("")}<span class="tag meteo">${r.met[0]} ${r.met[1]}</span></div>
+    <div class="tagrow">${r.cats.map(c=>`<span class="tag">${catLabel(c)}</span>`).join("")}${(r.extra||[]).map(t=>`<span class="tag">${esc(t)}</span>`).join("")}<span class="tag meteo">${r.met[0]} ${r.met[1]||""}</span></div>
     <p class="desc">${esc(r.desc)}</p>
     <div class="why"><b>Pourquoi pour vous&nbsp;:</b> ${esc(r.why)}</div>
     <div class="meta"><span>${I.pin}${esc(r.lieu)}</span><span>${I.clock}${esc(r.acces)}</span><span>💶 ${esc(r.prix)}</span></div>
-    <a class="linkbtn" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.q||r.lieu||r.t)}">${I.pin} Voir sur Google Maps</a>
+    <div class="linkrow">
+      ${r.lien?`<a class="linkbtn" target="_blank" rel="noopener" href="${esc(r.lien)}">${I.ext} Voir l'offre</a>`:""}
+      <a class="linkbtn ${r.lien?"alt":""}" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(r.q||r.lieu||r.t)}">${I.pin} Maps</a>
+    </div>
   </article>`;
 }
 function vResults(){
   const list=S.results||[];
+  let head="";
+  if(S.lastEngine==="gemini"||S.lastEngine==="claude"){
+    head=`<div class="demo" style="background:var(--mist-2);border-color:var(--line);color:var(--sage-deep)">✨<span><b>Propositions réelles</b> — générées par ${S.lastEngine==="claude"?"Claude":"Gemini"} avec recherche web, météo Open-Meteo, autour de ${esc(S.settings.pos?S.settings.pos.label:"votre position")}. Vérifie horaires et prix sur les liens avant de partir.</span></div>`;
+  }else if(S.lastEngine==="error"){
+    head=`<div class="demo">⚠️<span><b>Le moteur n'a pas répondu</b> — ${esc(S.lastError)}. Vérifie ta clé et ta connexion, puis réessaie.</span></div>
+    <div class="linkrow" style="margin-bottom:14px"><button class="btn subtle sm" data-act="goRetry" style="flex:1">Réessayer</button><button class="btn subtle sm" data-act="settings" style="flex:1">Réglages</button></div>`;
+  }else{
+    head=`<div class="demo">🧪<span><b>Aperçu de démonstration</b> (lieux fictifs). Ajoute ta clé Gemini dans les Réglages pour de vraies propositions autour de toi.</span></div>`;
+  }
   const body = list.length
     ? list.map((r,i)=>resCard(r,i)).join("")
-    : `<div class="card empty"><div class="em">⏱</div><h3 class="serif">Rien ne rentre dans ce temps de trajet</h3>
-       <p>Élargis le curseur de trajet ou coche d'autres transports, puis relance.</p></div>`;
-  const note = list.length && list.length<10
+    : (S.lastEngine==="error" ? "" :
+      `<div class="card empty"><div class="em">⏱</div><h3 class="serif">Rien ne rentre dans ce temps de trajet</h3>
+       <p>Élargis le curseur de trajet ou coche d'autres transports, puis relance.</p></div>`);
+  const note = S.lastEngine==="demo" && list.length && list.length<10
     ? `<p class="hint" style="margin:-6px 0 14px">${list.length} proposition${list.length>1?"s":""} dans le temps de trajet choisi — élargis le curseur ou les transports pour en voir plus.</p>`
     : "";
   return `
   <div class="backrow"><button class="iconbtn" data-act="backSearch" aria-label="Retour à la recherche">${I.back}</button>
     <div><h2 class="serif">Cap sur vos sorties</h2><p class="hint">${esc(searchSummary())}</p></div></div>
-  <div class="demo">🧪<span><b>Aperçu de démonstration.</b> Propositions et météo sont des exemples (lieux fictifs) ; les liens ouvrent Google Maps. Le vrai moteur IA — vraies adresses, vraie pertinence — se branche à la prochaine étape.</span></div>
-  ${note}${body}
+  ${head}${note}${body}
   <button class="btn ghost" data-act="backSearch">Modifier la recherche</button>`;
 }
 
@@ -815,6 +1028,11 @@ document.addEventListener("click", e=>{
   else if(a==="sTrans"){ togg(s.transports,v); render(); }
   else if(a==="sBudT"){ s.budgetOn=!s.budgetOn; render(); }
   else if(a==="goSearch") launchSearch("full");
+  else if(a==="goRetry") runSearch();
+  else if(a==="testKey") testKey(v);
+  else if(a==="setEngine"){ S.settings.engine=v; persist(); render(); }
+  else if(a==="geo") askGeo();
+  else if(a==="citySearch"){ const i2=document.getElementById("st-city"); const nm=i2?i2.value.trim():""; if(!nm) toast("Entre un nom de ville"); else cityLookup(nm); }
   else if(a==="goQuick") launchSearch("quick");
   else if(a==="sMode"){ S.searchMode=v; render(); }
   else if(a==="fav") toggleFav(v);
@@ -825,6 +1043,8 @@ document.addEventListener("click", e=>{
 document.addEventListener("input", e=>{
   const b=e.target.dataset.bind; if(!b) return;
   if(b==="name"||b==="age"||b==="free"||b==="avoid") S.tmp[b]=e.target.value;
+  else if(b==="gkey"){ S.settings.gkey=e.target.value; persist(); }
+  else if(b==="ckey"){ S.settings.ckey=e.target.value; persist(); }
   else if(b==="sdate") S.search.date=e.target.value;
   else if(b==="time"){ S.search.maxTime=+e.target.value; const o=document.getElementById("o-time"); if(o)o.textContent=S.search.maxTime+" min"; }
   else if(b==="budget"){ S.search.budget=+e.target.value; const o=document.getElementById("o-budget"); if(o)o.textContent=S.search.budget+" €"; }
