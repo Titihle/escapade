@@ -613,7 +613,7 @@ function vSettings(){
   <p class="eyebrow">Données</p>
   <button class="btn danger" data-act="reset">${I.trash} Réinitialiser l'application</button>
   <div class="spacer"></div>
-  <p class="hint" style="text-align:center">Escapade v0.6.3 — moteurs Gemini & Claude · météo Open-Meteo</p>`;
+  <p class="hint" style="text-align:center">Escapade v0.6.4 — moteurs Gemini & Claude · météo Open-Meteo</p>`;
 }
 async function testKey(kind){
   const isC = kind==="c";
@@ -843,13 +843,17 @@ function vSearch(){
 function vQuick(s){
   const one=(act,arr,cur)=>`<div class="chips">${arr.map(x=>`<button class="chip ${cur===x?"on":""}" data-act="${act}" data-v="${esc(x)}">${x}</button>`).join("")}</div>`;
   const who = S.profiles.length
-    ? `Pour toute la tribu — ${S.profiles.map(p=>esc(p.name)).join(", ")}.`
-    : `Aucun profil pour l'instant : la sélection sera générale.`;
+    ? `<p class="eyebrow">Qui part en escapade&nbsp;? <small>rien de coché = toute la tribu</small></p>
+  <div class="chips">${S.profiles.map((p,i)=>`<button class="chip ${s.who.includes(i)?"on":""}" data-act="sWho" data-v="${i}">${av(p,"")}${esc(p.name)}</button>`).join("")}</div>`
+    : "";
+  const intro = S.profiles.length
+    ? "Choisis qui part si besoin, la date et la durée — Escapade compose tout le reste d'après les goûts."
+    : "Donne la date et la durée — sans profil, la sélection sera générale.";
   return `
   <div class="card" style="padding:15px 16px;margin:2px 0 4px">
-    <p style="font-size:14.5px;line-height:1.5">⚡ <b>Recherche rapide.</b> Donne juste la date et la durée — Escapade compose le reste d'après les goûts des profils.</p>
-    <p class="hint" style="margin-top:6px">${who}</p>
+    <p style="font-size:14.5px;line-height:1.5">⚡ <b>Recherche rapide.</b> ${intro}</p>
   </div>
+  ${who}
   <p class="eyebrow">Quand&nbsp;?</p>
   ${one("sWhen",WHENS,s.when)}
   ${s.when==="Choisir une date"?`<input type="date" data-bind="sdate" value="${esc(s.date)}">`:""}
@@ -870,7 +874,7 @@ function searchSummary(){
 function launchSearch(mode){
   const s=S.search;
   if(mode!=="quick" && !s.cats.length){ toast("Choisis au moins un type de sortie"); return; }
-  if(mode==="quick") s.who=S.profiles.map((_,i)=>i);
+  if(mode==="quick" && !s.who.length) s.who=S.profiles.map((_,i)=>i);
   S.lastMode=mode||"full";
   runSearch();
 }
