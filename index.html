@@ -614,7 +614,7 @@ function vSettings(){
   <p class="eyebrow">Données</p>
   <button class="btn danger" data-act="reset">${I.trash} Réinitialiser l'application</button>
   <div class="spacer"></div>
-  <p class="hint" style="text-align:center">Escapade v0.7 — moteurs Gemini & Claude · météo & veille IA</p>`;
+  <p class="hint" style="text-align:center">Escapade v0.8 — moteurs, veille & mode abonnement</p>`;
 }
 async function testKey(kind){
   const isC = kind==="c";
@@ -838,7 +838,8 @@ function vSearch(){
   <div class="switchrow"><span>Fixer un budget max</span><button class="sw ${s.budgetOn?"on":""}" data-act="sBudT" role="switch" aria-checked="${s.budgetOn}" aria-label="Fixer un budget max"></button></div>
   ${s.budgetOn?`<div class="spacer"></div><div class="range">💶<input type="range" min="20" max="400" step="10" value="${s.budget}" data-bind="budget" aria-label="Budget maximum"><output id="o-budget">${s.budget} €</output></div>`:""}
   <div style="height:26px"></div>
-  <button class="btn" data-act="goSearch">OK, trouve-nous des sorties&nbsp;!</button>`;
+  <button class="btn" data-act="goSearch">OK, trouve-nous des sorties&nbsp;!</button>
+  <button class="btn subtle sm" data-act="copyPrompt" style="display:flex;margin:12px auto 0">📋 Copier la demande pour Claude / Gemini</button>`;
 }
 
 function vQuick(s){
@@ -860,7 +861,8 @@ function vQuick(s){
   ${s.when==="Choisir une date"?`<input type="date" data-bind="sdate" value="${esc(s.date)}">`:""}
   <p class="eyebrow">Quelle durée&nbsp;?</p>${one("sDuree",DUREES,s.duree)}
   <div style="height:26px"></div>
-  <button class="btn" data-act="goQuick">⚡ OK, surprends-nous&nbsp;!</button>`;
+  <button class="btn" data-act="goQuick">⚡ OK, surprends-nous&nbsp;!</button>
+  <button class="btn subtle sm" data-act="copyPrompt" style="display:flex;margin:12px auto 0">📋 Copier la demande pour Claude / Gemini</button>`;
 }
 
 function catLabel(id){ const c=CATS.find(x=>x.id===id); return c?c.label:id; }
@@ -945,6 +947,60 @@ RÉPONDS UNIQUEMENT avec ce JSON, sans aucun texte autour :
 {"evenements":[{"titre":"","date":"YYYY-MM-DD","emoji":"un seul emoji adapté","description":"1 phrase concrète","lieu":"nom exact du lieu","adresse":"commune","distance":"ex. à 3 km","prix":"ex. Gratuit ou Dès 8 €","lien":"URL réelle trouvée par la recherche sinon chaîne vide","pour":["prénoms des profils concernés, parmi : ${noms}"]}]}
 RÈGLES ABSOLUES : uniquement des événements réels et vérifiables ; dates comprises dans la période ; n'invente jamais un lieu ni un lien (sinon chaîne vide) ; privilégie la justesse à la vitesse.`;
 }
+function posLabel(){ return S.settings.pos ? S.settings.pos.label : "autour de chez moi (précise ta ville si on te la demande)"; }
+function profilesBlock(list){
+  return list.map(p=>`- ${p.name}, ${p.age||"âge non précisé"} ans. Aime : ${(p.tags||[]).concat(p.free?[p.free]:[]).join(", ")||"non précisé"}. À éviter : ${p.avoid||"rien"}.`).join("\n");
+}
+function buildManualPrompt(){
+  const s=S.search, quick=S.searchMode==="quick";
+  const idx=(quick && !s.who.length)? S.profiles.map((_,i)=>i) : s.who;
+  const who=idx.map(i=>S.profiles[i]).filter(Boolean);
+  const subs=Object.entries(s.subs||{}).map(([cid,g])=>Object.values(g).map(v=>catLabel(cid)+" → "+v.join(", ")).join(" ; ")).filter(Boolean);
+  const trans=s.transports.length? s.transports.map(t=>TLONG[t]).join(" ou ") : "voiture ou transports en commun (retenir le plus rapide des deux)";
+  return `Tu es mon concierge local d'idées de sorties. Fais de vraies recherches web avant de répondre.
+
+POSITION DE DÉPART : ${posLabel()}.
+DATE DE LA SORTIE : ${targetDate()}, moment : ${s.moment}. Durée souhaitée : ${s.duree}.
+PARTICIPANTS :
+${profilesBlock(who)||"- Sortie générale tout public."}
+${quick ? "TYPES DE SORTIE : choisis librement les plus adaptés à ces participants." : "TYPES DE SORTIE SOUHAITÉS (combinables) : "+s.cats.map(catLabel).join(" + ")+".\nPRÉCISIONS : "+(subs.join(" | ")||"aucune")+"."}
+TRANSPORT : ${trans}. TEMPS DE TRAJET MAXIMUM : ${s.maxTime} minutes.
+BUDGET TOTAL MAXIMUM : ${s.budgetOn? s.budget+" € pour tout le groupe" : "libre"}.
+MÉTÉO : vérifie la météo prévue sur place ce jour-là et tiens-en compte (privilégie l'intérieur si mauvais temps).
+
+MISSION : propose 10 sorties RÉELLES, existantes et ouvertes à cette date, atteignables dans le temps de trajet, classées de la plus à la moins pertinente pour CES participants. Pour chacune : titre, 1 à 2 phrases de description, « pourquoi pour nous » en citant les prénoms, lieu et adresse, temps de trajet, prix indicatif, et le LIEN réel (site officiel ou billetterie) trouvé par ta recherche — jamais de lien inventé. Privilégie la justesse à la vitesse.`;
+}
+function buildManualNewsPrompt(){
+  const t0=targetDateToday();
+  const d=new Date(); d.setDate(d.getDate()+30); const off=d.getTimezoneOffset();
+  const t1=new Date(d.getTime()-off*6e4).toISOString().slice(0,10);
+  const chk=S.profiles.filter((_,i)=>!S.newsOff.includes(i));
+  return `Tu es mon veilleur local d'événements. Fais de vraies recherches web avant de répondre.
+
+POSITION : ${posLabel()}.
+PÉRIODE : du ${t0} au ${t1} (les 30 prochains jours).
+PROFILS À INSPIRER :
+${profilesBlock(chk)||"- Aucun profil : sélection grand public et familiale."}
+
+MISSION : trouve 12 événements ou bons plans ÉPHÉMÈRES et RÉELS dans cette période (fêtes locales, expositions temporaires, spectacles, marchés spéciaux, festivals, portes ouvertes, animations, promotions locales notables), à moins de 45 minutes de la position. Répartis les dates sur toute la période et adapte la sélection aux goûts des profils. Pour chacun : date précise, titre, 1 phrase de description, lieu et commune, distance, prix, et le LIEN réel trouvé par ta recherche — jamais de lien inventé. Classe le tout par date. Privilégie la justesse à la vitesse.`;
+}
+async function copyText(t){
+  try{ await navigator.clipboard.writeText(t); return true; }
+  catch(e){
+    try{
+      const ta=document.createElement("textarea");
+      ta.value=t; ta.style.position="fixed"; ta.style.opacity="0";
+      document.body.appendChild(ta); ta.select();
+      const ok=document.execCommand("copy"); ta.remove(); return ok;
+    }catch(e2){ return false; }
+  }
+}
+async function copyManual(kind){
+  if(kind==="search" && S.searchMode!=="quick" && !S.search.cats.length){ toast("Choisis au moins un type de sortie"); return; }
+  const t = kind==="news" ? buildManualNewsPrompt() : buildManualPrompt();
+  if(await copyText(t)) toast("Demande copiée — colle-la dans Claude ou Gemini !");
+  else toast("Copie impossible sur cet appareil");
+}
 async function engineJSON(promptText,eng){
   const txt = eng==="claude" ? await claudeCall(promptText,true) : await geminiCall(promptText,true);
   return extractJSON(txt);
@@ -1016,12 +1072,15 @@ function vResults(){
   if(S.lastEngine==="gemini"||S.lastEngine==="claude"){
     head=`<div class="demo" style="background:var(--mist-2);border-color:var(--line);color:var(--sage-deep)">✨<span><b>Propositions réelles</b> — générées par ${S.lastEngine==="claude"?"Claude":"Gemini"} avec recherche web, météo Open-Meteo, autour de ${esc(S.settings.pos?S.settings.pos.label:"votre position")}. Vérifie horaires et prix sur les liens avant de partir.</span></div>`;
   }else if(S.lastEngine==="error"){
-    const surch=/surcharg/i.test(S.lastError||"");
-    const suffix = surch ? "Cela vient des serveurs du moteur, pas de ta clé — patiente une minute." : "Vérifie ta clé et ta connexion, puis réessaie.";
+    const surch=/surcharg/i.test(S.lastError||""), quota=/quota/i.test(S.lastError||"");
+    const suffix = quota ? "Le palier gratuit se recharge chaque nuit vers 9 h, heure de Paris — patiente, ou bascule sur Claude."
+      : surch ? "Cela vient des serveurs du moteur, pas de ta clé — patiente une minute."
+      : "Vérifie ta clé et ta connexion, puis réessaie.";
     const alt = (S.lastFailedEngine==="gemini" && (S.settings.ckey||"").trim())
       ? `<button class="btn subtle sm" data-act="retryOther" style="flex:1">Tenter avec Claude</button>` : "";
     head=`<div class="demo">⚠️<span><b>Le moteur n'a pas répondu</b> — ${esc(S.lastError)}. ${suffix}</span></div>
-    <div class="linkrow" style="margin-bottom:14px"><button class="btn subtle sm" data-act="goRetry" style="flex:1">Réessayer</button>${alt}<button class="btn subtle sm" data-act="settings" style="flex:1">Réglages</button></div>`;
+    <div class="linkrow" style="margin-bottom:14px"><button class="btn subtle sm" data-act="goRetry" style="flex:1">Réessayer</button>${alt}<button class="btn subtle sm" data-act="settings" style="flex:1">Réglages</button></div>
+    <button class="btn subtle sm" data-act="copyPrompt" style="display:flex;margin:0 auto 14px">📋 Copier la demande pour mon abonnement</button>`;
   }else{
     head=`<div class="demo">🧪<span><b>Aperçu de démonstration</b> (lieux fictifs). Ajoute ta clé Gemini dans les Réglages pour de vraies propositions autour de toi.</span></div>`;
   }
@@ -1089,15 +1148,18 @@ function vNews(){
       <p>Indique ta position dans les Réglages pour balayer les 30 prochains jours autour de toi.</p>
       <button class="btn sm" data-act="settings" style="margin:0 auto">Ouvrir les Réglages</button></div>`;
   }else if(S.newsError){
-    const surch=/surcharg/i.test(S.newsError);
+    const surch=/surcharg/i.test(S.newsError), quota=/quota/i.test(S.newsError);
     const alt=(S.newsFailedEngine==="gemini"&&(S.settings.ckey||"").trim())
       ? `<button class="btn subtle sm" data-act="newsClaude" style="flex:1">Tenter avec Claude</button>` : "";
-    body=`<div class="demo">⚠️<span><b>La veille n'a pas abouti</b> — ${esc(S.newsError)}. ${surch?"Cela vient des serveurs du moteur, pas de ta clé.":"Vérifie ta clé et ta connexion."}</span></div>
-    <div class="linkrow"><button class="btn subtle sm" data-act="newsRun" style="flex:1">Réessayer</button>${alt}<button class="btn subtle sm" data-act="settings" style="flex:1">Réglages</button></div>`;
+    body=`<div class="demo">⚠️<span><b>La veille n'a pas abouti</b> — ${esc(S.newsError)}. ${quota?"Le palier gratuit se recharge chaque nuit vers 9 h, heure de Paris — patiente, ou bascule sur Claude.":surch?"Cela vient des serveurs du moteur, pas de ta clé.":"Vérifie ta clé et ta connexion."}</span></div>
+    <div class="linkrow"><button class="btn subtle sm" data-act="newsRun" style="flex:1">Réessayer</button>${alt}<button class="btn subtle sm" data-act="settings" style="flex:1">Réglages</button></div>
+    <button class="btn subtle sm" data-act="copyNewsPrompt" style="display:flex;margin:0 auto">📋 Copier la demande pour mon abonnement</button>`;
   }else if(!S.news){
     body=`<div class="card empty"><div class="em">🔭</div><h3 class="serif">Que se passe-t-il autour de vous&nbsp;?</h3>
       <p>Escapade balaie les 30 prochains jours — événements éphémères, expos, fêtes, bons plans — et retient ce qui colle aux profils cochés.</p>
-      <button class="btn sm" data-act="newsRun" style="margin:0 auto">🔭 Lancer la veille</button></div>`;
+      <button class="btn sm" data-act="newsRun" style="margin:0 auto">🔭 Lancer la veille</button>
+      <div class="spacer"></div>
+      <button class="btn subtle sm" data-act="copyNewsPrompt" style="margin:0 auto">📋 Copier la demande (abonnement)</button></div>`;
   }else{
     const chk=checkedNames();
     const items=[...S.news.items].map(e=>{
@@ -1106,7 +1168,7 @@ function vNews(){
     }).sort((a,b)=> b._m-a._m || String(a.date).localeCompare(String(b.date)));
     const stale = S.news.who!==chk.join(",");
     body=`<div class="demo" style="background:var(--mist-2);border-color:var(--line);color:var(--sage-deep)">✨<span><b>Veille réelle</b> — ${S.news.eng==="claude"?"Claude":"Gemini"} · autour de ${esc(S.settings.pos.label)} · actualisée ${relTime(S.news.ts)}.${stale?" Profils modifiés — actualise pour recomposer.":""} Vérifie dates et horaires sur les liens.</span></div>
-    <button class="btn subtle sm" data-act="newsRun" style="margin:0 0 14px">↻ Actualiser la veille</button>
+    <div class="linkrow" style="margin:0 0 14px"><button class="btn subtle sm" data-act="newsRun" style="flex:1">↻ Actualiser</button><button class="btn subtle sm" data-act="copyNewsPrompt" style="flex:1">📋 Copier (abonnement)</button></div>
     ${items.map(e=>evCard(e,false)).join("")}`;
   }
   return `
@@ -1193,6 +1255,8 @@ document.addEventListener("click", e=>{
   else if(a==="retryOther") runSearch("claude");
   else if(a==="newsRun") runNews();
   else if(a==="newsClaude") runNews("claude");
+  else if(a==="copyPrompt") copyManual("search");
+  else if(a==="copyNewsPrompt") copyManual("news");
   else if(a==="testKey") testKey(v);
   else if(a==="setEngine"){ S.settings.engine=v; persist(); render(); }
   else if(a==="geo") askGeo();
