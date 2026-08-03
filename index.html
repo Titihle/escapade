@@ -327,6 +327,7 @@ const AVCOLORS = ["#5F7A4F","#B0723F","#4F6E7A","#8A5F7A","#7A9C6B","#C08A4A","#
 const TFACT  = { voiture:1, tc:1.4, velo:2.2, pied:4 };
 const TSHORT = { voiture:"voiture", tc:"transports", velo:"vélo", pied:"à pied" };
 const TLONG  = { voiture:"voiture", tc:"transports en commun", velo:"vélo", pied:"à pied" };
+function timeFloor(){ return Math.max(0, Math.round(S.search.maxTime*0.4/5)*5); }
 function travelFor(minCar){
   const allowed = S.search.transports.length ? S.search.transports : ["voiture","tc"];
   let best=null;
@@ -412,7 +413,7 @@ function mockResults(){
     const tr = travelFor(r.minCar);
     return { ...r, _s:sc, _t:tr.t, acces:`${tr.t} min · ${TSHORT[tr.m]}` };
   }).sort((a,b)=>b._s-a._s);
-  const within = scored.filter(r=>r._t <= s.maxTime).slice(0,10);
+  const within = scored.filter(r=> r._t <= s.maxTime && r._t >= timeFloor()).slice(0,10);
   return within.map((r,i)=>({ ...r, id:"demo-"+i, q:r.lieu||r.t }));
 }
 function mockEvents(){
@@ -622,7 +623,7 @@ function vSettings(){
   <p class="eyebrow">Données</p>
   <button class="btn danger" data-act="reset">${I.trash} Réinitialiser l'application</button>
   <div class="spacer"></div>
-  <p class="hint" style="text-align:center">Escapade v0.8.2 — moteurs, veille & mode abonnement</p>`;
+  <p class="hint" style="text-align:center">Escapade v0.9 — moteurs, veille & mode abonnement</p>`;
 }
 async function testKey(kind){
   const isC = kind==="c";
@@ -684,7 +685,7 @@ function buildPrompt(dateStr,meteo){
   const s=S.search, pos=S.settings.pos;
   const parts=s.who.map(i=>S.profiles[i]).filter(Boolean).map(p=>`- ${p.name}, ${p.age||"âge non précisé"} ans. Aime : ${(p.tags||[]).concat(p.free?[p.free]:[]).join(", ")||"non précisé"}. À éviter : ${p.avoid||"rien de précisé"}.`);
   const subs=Object.entries(s.subs||{}).map(([cid,g])=>Object.values(g).map(v=>catLabel(cid)+" → "+v.join(", ")).join(" ; ")).filter(Boolean);
-  const trans=s.transports.length? s.transports.map(t=>TLONG[t]).join(" ou ") : "voiture ou transports en commun (retenir le plus rapide des deux)";
+  const trans=s.transports.length? s.transports.map(t=>TLONG[t]).join(" ou ")+" UNIQUEMENT — mode strict : calcule et exprime chaque temps de trajet avec ce ou ces modes, jamais un autre" : "voiture ou transports en commun (retenir le plus rapide des deux)";
   return `Tu es le concierge local d'une application familiale d'idées de sorties.
 POSITION DE DÉPART : ${pos.label} (latitude ${pos.lat}, longitude ${pos.lon}).
 DATE DE LA SORTIE : ${dateStr}, moment : ${s.moment}. Durée souhaitée : ${s.duree}.
@@ -693,7 +694,8 @@ ${parts.join("\n")||"- Non précisé (sortie générale tout public)"}
 ${S.lastMode==="quick"
   ? "MODE RAPIDE : aucun type imposé — choisis librement les types de sorties les plus adaptés à ces participants."
   : "TYPES DE SORTIE SOUHAITÉS (combinables entre eux) : "+s.cats.map(catLabel).join(" + ")+".\nPRÉCISIONS : "+(subs.join(" | ")||"aucune")+"."}
-TRANSPORT : ${trans}. TEMPS DE TRAJET MAXIMUM : ${s.maxTime} minutes depuis la position de départ.
+TRANSPORT : ${trans}.
+TEMPS DE TRAJET : cible entre ${timeFloor()} et ${s.maxTime} minutes depuis la position de départ, avec le mode indiqué. N'inclus PAS de lieux nettement plus proches que ${timeFloor()} minutes — l'utilisateur souhaite s'éloigner — ni au-delà de ${s.maxTime} minutes.
 BUDGET TOTAL MAXIMUM : ${s.budgetOn? s.budget+" € pour tout le groupe" : "libre"}.
 MÉTÉO PRÉVUE SUR PLACE CE JOUR-LÀ : ${meteo?meteo.desc:"non disponible"} — tiens-en compte (privilégie l'intérieur si mauvais temps).
 MISSION : à l'aide de la recherche web, trouve 10 sorties RÉELLES, existantes, ouvertes/disponibles à cette date, atteignables dans le temps de trajet. Classe-les de la plus à la moins pertinente pour CES participants précisément.
@@ -841,7 +843,7 @@ function vSearch(){
   <div class="chips">${TRANSPORTS.map(([id,l])=>`<button class="chip ${s.transports.includes(id)?"on":""}" data-act="sTrans" data-v="${id}">${l}</button>`).join("")}</div>
   <p class="eyebrow">Temps de trajet max</p>
   <div class="range">${I.clock}<input type="range" min="15" max="90" step="5" value="${s.maxTime}" data-bind="time" aria-label="Temps de trajet maximum"><output id="o-time">${s.maxTime} min</output></div>
-  <p class="hint" style="margin-top:8px">⏱ Évalué : ${s.transports.length ? s.transports.map(t=>TLONG[t]).join(" ou ") : "voiture ou transports en commun (par défaut)"}.</p>
+  <p class="hint" style="margin-top:8px">⏱ Cible : entre <b id="o-floor">${timeFloor()} et ${s.maxTime} min</b> · ${s.transports.length ? s.transports.map(t=>TLONG[t]).join(" ou ")+" (mode strict)" : "voiture ou transports en commun (le plus rapide)"}.</p>
   <p class="eyebrow">Budget de la sortie <small>optionnel</small></p>
   <div class="switchrow"><span>Fixer un budget max</span><button class="sw ${s.budgetOn?"on":""}" data-act="sBudT" role="switch" aria-checked="${s.budgetOn}" aria-label="Fixer un budget max"></button></div>
   ${s.budgetOn?`<div class="spacer"></div><div class="range">💶<input type="range" min="20" max="400" step="10" value="${s.budget}" data-bind="budget" aria-label="Budget maximum"><output id="o-budget">${s.budget} €</output></div>`:""}
@@ -964,7 +966,7 @@ function buildManualPrompt(){
   const idx=(quick && !s.who.length)? S.profiles.map((_,i)=>i) : s.who;
   const who=idx.map(i=>S.profiles[i]).filter(Boolean);
   const subs=Object.entries(s.subs||{}).map(([cid,g])=>Object.values(g).map(v=>catLabel(cid)+" → "+v.join(", ")).join(" ; ")).filter(Boolean);
-  const trans=s.transports.length? s.transports.map(t=>TLONG[t]).join(" ou ") : "voiture ou transports en commun (retenir le plus rapide des deux)";
+  const trans=s.transports.length? s.transports.map(t=>TLONG[t]).join(" ou ")+" UNIQUEMENT — mode strict : calcule et exprime chaque temps de trajet avec ce ou ces modes, jamais un autre" : "voiture ou transports en commun (retenir le plus rapide des deux)";
   return `Tu es mon concierge local d'idées de sorties. Fais de vraies recherches web avant de répondre.
 
 POSITION DE DÉPART : ${posLabel()}.
@@ -972,7 +974,8 @@ DATE DE LA SORTIE : ${targetDate()}, moment : ${s.moment}. Durée souhaitée : $
 PARTICIPANTS :
 ${profilesBlock(who)||"- Sortie générale tout public."}
 ${quick ? "TYPES DE SORTIE : choisis librement les plus adaptés à ces participants." : "TYPES DE SORTIE SOUHAITÉS (combinables) : "+s.cats.map(catLabel).join(" + ")+".\nPRÉCISIONS : "+(subs.join(" | ")||"aucune")+"."}
-TRANSPORT : ${trans}. TEMPS DE TRAJET MAXIMUM : ${s.maxTime} minutes.
+TRANSPORT : ${trans}.
+TEMPS DE TRAJET : cible entre ${timeFloor()} et ${s.maxTime} minutes, avec le mode indiqué. N'inclus PAS de lieux nettement plus proches que ${timeFloor()} minutes — je souhaite m'éloigner — ni au-delà de ${s.maxTime} minutes.
 BUDGET TOTAL MAXIMUM : ${s.budgetOn? s.budget+" € pour tout le groupe" : "libre"}.
 MÉTÉO : vérifie la météo prévue sur place ce jour-là et tiens-en compte (privilégie l'intérieur si mauvais temps).
 
@@ -1282,7 +1285,7 @@ document.addEventListener("input", e=>{
   else if(b==="gkey"){ S.settings.gkey=e.target.value; persist(); }
   else if(b==="ckey"){ S.settings.ckey=e.target.value; persist(); }
   else if(b==="sdate") S.search.date=e.target.value;
-  else if(b==="time"){ S.search.maxTime=+e.target.value; const o=document.getElementById("o-time"); if(o)o.textContent=S.search.maxTime+" min"; }
+  else if(b==="time"){ S.search.maxTime=+e.target.value; const o=document.getElementById("o-time"); if(o)o.textContent=S.search.maxTime+" min"; const f=document.getElementById("o-floor"); if(f)f.textContent=timeFloor()+" et "+S.search.maxTime+" min"; }
   else if(b==="budget"){ S.search.budget=+e.target.value; const o=document.getElementById("o-budget"); if(o)o.textContent=S.search.budget+" €"; }
 });
 
